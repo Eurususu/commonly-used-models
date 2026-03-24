@@ -3,7 +3,7 @@
 from .common import *
 import torch
 import torch.nn as nn
-from .registry import register_model
+from .Registry import register_model
 from .BaseModel import BaseModel
 
 __all__ = ['UNet', 'ResUNet']

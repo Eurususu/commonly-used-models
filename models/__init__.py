@@ -6,7 +6,7 @@ import os
 import importlib
 
 # 1. 暴露常用的工厂函数和基类，方便外部直接从包名导入
-from .registry import build_model, list_models, register_model
+from .Registry import build_model, list_models, register_model
 from .BaseModel import BaseModel
 
 # # 2. 自动导入各个具体的模型文件

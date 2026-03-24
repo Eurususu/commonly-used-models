@@ -8,10 +8,9 @@
     https://arxiv.org/abs/1512.03385v1
 """
 
-import torch
 import torch.nn as nn
 from .common import BasicBlock, BottleNeck
-from .registry import register_model
+from .Registry import register_model
 from .BaseModel import BaseModel
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
