@@ -10,10 +10,10 @@ print("\n=== 测试构建损失函数 ===")
 
 # 1. 测试 CrossEntropy (需要查看实际的类名)
 try:
-    loss_fn = build_loss("cross_entropy")
-    print(f"cross_entropy: {loss_fn}")
+    loss_fn = build_loss("CrossEntropyLoss")
+    print(f"CrossEntropyLoss: {loss_fn}")
 except Exception as e:
-    print(f"cross_entropy 失败: {e}")
+    print(f"CrossEntropyLoss 失败: {e}")
 
 # 2. 测试 LabelSmoothingCrossEntropy
 try:
