@@ -9,8 +9,8 @@
 """
 
 import torch.nn as nn
-from .common import BasicBlock, BottleNeck
-from .Registry import register_model
+from layers import BasicBlock, BottleNeck
+from ._modelRegistry import register_model
 from .BaseModel import BaseModel
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
@@ -18,8 +18,8 @@ __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
 class ResNet(BaseModel):
 
-    def __init__(self, block, num_block, num_classes=100, **kwargs):
-        super().__init__(num_classes=num_classes, **kwargs)
+    def __init__(self, block, num_block, num_classes=100):
+        super().__init__()
 
         self.in_channels = 64
 
@@ -94,10 +94,6 @@ class ResNet(BaseModel):
         output = self.fc(output)
 
         return output
-
-    @staticmethod
-    def get_default_config():
-        return {"num_classes": 100}
 
 @register_model("resnet18")
 def resnet18(num_classes=100):

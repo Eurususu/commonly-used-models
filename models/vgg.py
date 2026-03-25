@@ -3,7 +3,7 @@ Modified from https://github.com/pytorch/vision.git
 '''
 
 import torch.nn as nn
-from .Registry import register_model
+from ._modelRegistry import register_model
 from .BaseModel import BaseModel
 
 __all__ = [
@@ -16,8 +16,8 @@ class VGG(BaseModel):
     '''
     VGG model
     '''
-    def __init__(self, features, num_classes=10, **kwargs):
-        super().__init__(num_classes=num_classes, **kwargs)
+    def __init__(self, features, num_classes=10):
+        super().__init__()
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
@@ -57,10 +57,6 @@ class VGG(BaseModel):
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
         return x
-
-    @staticmethod
-    def get_default_config():
-        return {"num_classes": 10}
 
 
 def make_layers(cfg, batch_norm=False):

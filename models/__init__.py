@@ -6,7 +6,7 @@ import os
 import importlib
 
 # 1. 暴露常用的工厂函数和基类，方便外部直接从包名导入
-from .Registry import build_model, list_models, register_model
+from ._modelRegistry import build_model, list_models, register_model
 from .BaseModel import BaseModel
 
 # # 2. 自动导入各个具体的模型文件
@@ -24,7 +24,7 @@ for filename in os.listdir(current_dir):
         module_name = filename[:-3]
 
         # 为了严谨，我们跳过基础组件文件，只导入具体的模型文件
-        if module_name not in ["registry", "BaseModel", "common"]:
+        if module_name not in ["BaseModel"]:
             # 这行代码等价于手动写的：from . import module_name
             importlib.import_module(f".{module_name}", package=__name__)
             
@@ -37,15 +37,3 @@ __all__ = [
     'BaseModel'
 ]
 
-
-# # 统一工厂函数和注册表
-# from .factory import (
-#     build_model,
-#     list_models,
-#     MODEL_REGISTRY,
-#     BaseModel,
-#     register_model
-# )
-
-# # 统一的训练/验证/预测接口
-# from .runner import ModelRunner, create_runner

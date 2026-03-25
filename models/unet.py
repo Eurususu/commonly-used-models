@@ -1,9 +1,9 @@
 """ Full assembly of the parts to form the complete network """
 
-from .common import *
+from layers import DoubleConv, Down, Up, OutConv, BasicBlock, ResDown, ResUp
 import torch
 import torch.nn as nn
-from .Registry import register_model
+from ._modelRegistry import register_model
 from .BaseModel import BaseModel
 
 __all__ = ['UNet', 'ResUNet']
@@ -11,8 +11,8 @@ __all__ = ['UNet', 'ResUNet']
 
 @register_model("unet")
 class UNet(BaseModel):
-    def __init__(self, num_channels=3, num_classes=1, bilinear=False, **kwargs):
-        super().__init__(num_classes=num_classes, **kwargs)
+    def __init__(self, num_channels=3, num_classes=1, bilinear=False):
+        super().__init__()
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.bilinear = bilinear
@@ -56,14 +56,6 @@ class UNet(BaseModel):
         logits = self.outc(x)
         return logits
 
-    @staticmethod
-    def get_default_config():
-        return {
-            "num_channels": 3,
-            "num_classes": 1,
-            "bilinear": False
-        }
-
     def use_checkpointing(self):
         self.inc = torch.utils.checkpoint(self.inc)
         self.down1 = torch.utils.checkpoint(self.down1)
@@ -79,10 +71,8 @@ class UNet(BaseModel):
 
 @register_model("resunet")
 class ResUNet(BaseModel):
-    # 1. 增加默认值和 **kwargs 以完美兼容工厂函数的调用
-    def __init__(self, num_channels=3, num_classes=1, bilinear=False, **kwargs):
-        # 2. 正确初始化父类 BaseModel，将 num_classes 映射给父类的 num_classes
-        super(ResUNet, self).__init__(num_classes=num_classes, **kwargs)
+    def __init__(self, num_channels=3, num_classes=1, bilinear=False):
+        super().__init__()
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.bilinear = bilinear
@@ -132,11 +122,3 @@ class ResUNet(BaseModel):
         x = self.up4(x, x1)
         logits = self.outc(x)
         return logits
-    
-    @staticmethod
-    def get_default_config():
-        return {
-            "num_channels": 3,
-            "num_classes": 1,
-            "bilinear": False
-        }
