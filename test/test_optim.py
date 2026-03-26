@@ -11,30 +11,30 @@ model = nn.Linear(10, 2)
 
 # 1. 测试 SGD 优化器
 print("\n=== 测试 SGD ===")
-optimizer = build_optimizer("SGD", params=model.parameters(), lr=0.01)
+optimizer = build_optimizer(params=model.parameters(), name="SGD", lr=0.01)
 print(f"SGD: {optimizer}")
 print(f"  lr: {optimizer.param_groups[0]['lr']}")
 
 # 2. 测试 Adam 优化器
 print("\n=== 测试 Adam ===")
-optimizer = build_optimizer("Adam", params=model.parameters(), lr=0.001, betas=(0.9, 0.999))
+optimizer = build_optimizer(params=model.parameters(), name="Adam", lr=0.001, betas=(0.9, 0.999))
 print(f"Adam: {optimizer}")
 print(f"  lr: {optimizer.param_groups[0]['lr']}")
 
 # 3. 测试 AdamW 优化器
 print("\n=== 测试 AdamW ===")
-optimizer = build_optimizer("AdamW", params=model.parameters(), lr=0.001, weight_decay=0.01)
+optimizer = build_optimizer(params=model.parameters(), name="AdamW", lr=0.001, weight_decay=0.01)
 print(f"AdamW: {optimizer}")
 print(f"  weight_decay: {optimizer.param_groups[0]['weight_decay']}")
 
 # 4. 测试 RMSprop 优化器
 print("\n=== 测试 RMSprop ===")
-optimizer = build_optimizer("RMSprop", params=model.parameters(), lr=0.01, alpha=0.99)
+optimizer = build_optimizer(params=model.parameters(), name="RMSprop", lr=0.01, alpha=0.99)
 print(f"RMSprop: {optimizer}")
 
 # 5. 测试优化器实际更新参数
 print("\n=== 测试参数更新 ===")
-optimizer = build_optimizer("SGD", params=model.parameters(), lr=0.1)
+optimizer = build_optimizer(params=model.parameters(), name="SGD", lr=0.1)
 
 # 保存更新前的参数
 params_before = [p.clone() for p in model.parameters()]
@@ -60,6 +60,6 @@ print(f"参数已更新: {updated}")
 # 6. 测试不存在的优化器
 print("\n=== 测试错误处理 ===")
 try:
-    build_optimizer("non_existent_optimizer", params=model.parameters())
+    build_optimizer(params=model.parameters(), name="non_existent_optimizer")
 except ValueError as e:
     print(f"正确捕获异常: {e}")

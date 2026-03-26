@@ -1,4 +1,5 @@
 from typing import Dict, Callable, Any
+import logging
 
 class Registry:
     """一个通用的注册表类，可以用来注册任何组件（Model, Loss, Optim 等）"""
@@ -6,13 +7,16 @@ class Registry:
         self.name = name
         self._module_dict: Dict[str, Callable] = {}
 
-    def register(self, name: str = None):
+    def register(self, name: str = None, force: bool = False):
         """装饰器：注册模块"""
         def decorator(obj: Callable):
             target_name = name if name is not None else obj.__name__
             target_name = target_name.lower()
             if target_name in self._module_dict:
-                raise KeyError(f"模块 {target_name} 已经在 {self.name} 中注册过了！")
+                if not force:
+                    raise KeyError(f"模块 {target_name} 已经在 {self.name} 中注册过了！")
+                else:
+                    logging.warning(f"⚠️ 警告: 模块 {target_name} 已经在 {self.name} 中注册过了，将被强制覆盖。")
             self._module_dict[target_name] = obj
             return obj
         return decorator
