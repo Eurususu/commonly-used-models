@@ -15,7 +15,7 @@ __all__ = [
 class ResDown(nn.Module):
     """使用残差块的下采样模块"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
@@ -29,7 +29,7 @@ class ResDown(nn.Module):
 class ResUp(nn.Module):
     """使用残差块的上采样模块"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, bilinear=True, **kwargs):
         super().__init__()
 
         if bilinear:

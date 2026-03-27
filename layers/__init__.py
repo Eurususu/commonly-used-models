@@ -3,13 +3,16 @@
 请勿手动修改此文件，如需更新请运行 scripts/generate_inits.py
 """
 
+from .common import Concat, Add
 from .resnet_layers import BasicBlock, BottleNeck
 from .resunet_layers import ResDown, ResUp
 from .unet_layers import DoubleConv, Down, Up, OutConv
 
 __all__ = [
+    'Add',
     'BasicBlock',
     'BottleNeck',
+    'Concat',
     'DoubleConv',
     'Down',
     'OutConv',

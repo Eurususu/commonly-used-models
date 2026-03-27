@@ -14,7 +14,7 @@ class BasicBlock(nn.Module):
 
     expansion = 1
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, **kwargs):
         super().__init__()
 
         self.residual_function = nn.Sequential(
@@ -42,7 +42,7 @@ class BottleNeck(nn.Module):
 
     expansion = 4
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, **kwargs):
         super().__init__()
         self.residual_function = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
