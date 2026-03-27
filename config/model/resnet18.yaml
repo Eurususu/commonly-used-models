@@ -1,14 +1,15 @@
 model: 
   name: "resnet18"
-  num_classes: 100
+  kwargs:
+    num_classes: 100
 
 optim: 
   name: "adamw"
+  kwargs: {}
 
 scheduler: 
   name: "cosine_annealing"
-  kwargs: {
-    "T_max": 50, # 50个 epoch 降到最低点
-    "eta_min": 1e-5 # 最低学习率
-  }
+  kwargs:
+    T_max: 50 # 50个 epoch 降到最低点
+    eta_min: 1.0e-5 # 最低学习率
 

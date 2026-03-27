@@ -1,6 +1,6 @@
 # config/model/custom_net.yaml
 model:
-  name: "dynamic_seq_model"  # 我们即将编写的通用容器模型
+  name: "dynamic_graph_model"  # 我们即将编写的通用容器模型
   kwargs:
     # 按照顺序定义你想拼装的 Layer
     layers_cfg:

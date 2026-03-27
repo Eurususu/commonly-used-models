@@ -1,0 +1,58 @@
+# ==========================================
+# 完整 U-Net 动态拓扑配置 (bilinear=False)
+# ==========================================
+model:
+  name: "dynamic_graph_model"
+  kwargs:
+    layers_cfg:
+      # -----------------------------------------------------------------
+      # 【Encoder 编码器阶段】(不断下采样，提取特征)
+      # -----------------------------------------------------------------
+      - name: "DoubleConv"   # [层索引 0]
+        from: "input"        # 接收原始图片
+        args: {"in_channels": 3, "out_channels": 64}
+
+      - name: "Down"         # [层索引 1]
+        from: -1             # 接收 [0] 的输出
+        args: {"in_channels": 64, "out_channels": 128}
+
+      - name: "Down"         # [层索引 2]
+        from: -1             # 接收 [1] 的输出
+        args: {"in_channels": 128, "out_channels": 256}
+
+      - name: "Down"         # [层索引 3]
+        from: -1             # 接收 [2] 的输出
+        args: {"in_channels": 256, "out_channels": 512}
+
+      # --- 瓶颈层 (Bottleneck) ---
+      - name: "Down"         # [层索引 4]
+        from: -1             # 接收 [3] 的输出
+        args: {"in_channels": 512, "out_channels": 1024}
+
+      # -----------------------------------------------------------------
+      # 【Decoder 解码器阶段】(上采样 + 跳跃连接融合)
+      # 注意这里的 from 字段：[-1, 对应Encoder的层索引]
+      # 我们的引擎会自动将其解包为 x1(上一层输出), x2(跳跃连接特征)
+      # -----------------------------------------------------------------
+      - name: "Up"           # [层索引 5]
+        from: [-1, 3]        # 接收 [4] 的输出(x1)，并融合 [3] 的特征(x2)
+        args: {"in_channels": 1024, "out_channels": 512, "bilinear": False}
+
+      - name: "Up"           # [层索引 6]
+        from: [-1, 2]        # 接收 [5] 的输出(x1)，并融合 [2] 的特征(x2)
+        args: {"in_channels": 512, "out_channels": 256, "bilinear": False}
+
+      - name: "Up"           # [层索引 7]
+        from: [-1, 1]        # 接收 [6] 的输出(x1)，并融合 [1] 的特征(x2)
+        args: {"in_channels": 256, "out_channels": 128, "bilinear": False}
+
+      - name: "Up"           # [层索引 8]
+        from: [-1, 0]        # 接收 [7] 的输出(x1)，并融合 [0] 的特征(x2)
+        args: {"in_channels": 128, "out_channels": 64, "bilinear": False}
+
+      # -----------------------------------------------------------------
+      # 【输出层】(还原为期望的类别数，例如二分类/单通道掩码输出)
+      # -----------------------------------------------------------------
+      - name: "OutConv"      # [层索引 9]
+        from: -1
+        args: {"in_channels": 64, "out_channels": 1}
