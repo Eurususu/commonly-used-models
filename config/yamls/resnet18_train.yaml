@@ -1,0 +1,61 @@
+data:
+  train_transforms: [
+      {"name": "resize", "kwargs": {"size": [224, 224]}},
+      {"name": "random_horizontal_flip", "kwargs": {"p": 0.5}},
+      # {"name": "color_jitter", "kwargs": {"brightness": 0.2, "contrast": 0.2, "saturation": 0.2, "hue": 0.1}},
+      {"name": "to_tensor", "kwargs": {}},
+      {"name": "normalize", "kwargs": {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}}
+    ]
+  
+  train_dataset:
+    name: "cls_dataset"
+    kwargs: {
+      data_dir: "./dummy_imagenet/train"
+    }
+
+  val_transforms: [
+      {"name": "resize", "kwargs": {"size": [224, 224]}},
+      {"name": "to_tensor", "kwargs": {}},
+      {"name": "normalize", "kwargs": {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}}
+    ]
+
+  val_dataset:
+    name: "cls_dataset"
+    kwargs: {
+      data_dir: "./dummy_imagenet/val"
+    }
+
+  train_loader:
+    batch_size: 16
+    shuffle: True
+    num_workers: 8
+
+
+  val_loader:
+    batch_size: 16
+    shuffle: False
+    num_workers: 8
+
+model: 
+  name: "resnet18"
+  num_classes: 3
+
+optim: 
+  name: "adamw"
+  kwargs: {
+    "lr": 0.001,
+    "weight_decay": 0.0001
+  }
+
+scheduler: 
+  name: "cosine_annealing"
+  kwargs: {
+    "T_max": 50, # 50个 epoch 降到最低点
+    "eta_min": 1.0e-5 # 最低学习率
+  }
+
+
+loss:
+  name: "crossentropyloss"
+  kwargs: {}
+

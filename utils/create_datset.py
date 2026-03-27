@@ -3,7 +3,7 @@ import shutil
 import numpy as np
 from PIL import Image
 
-def create_dummy_imagenet(root_dir="./dummy_imagenet", num_classes=3, imgs_per_class=100):
+def create_dummy_imagenet(root_dir="./dummy_imagenet/val", num_classes=3, imgs_per_class=30):
     """
     创建一个迷你的假 ImageNet 数据集目录，用于快速测试
     """
