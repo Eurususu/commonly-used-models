@@ -56,7 +56,7 @@ def main():
         dist.init_process_group(backend="nccl")
         # 绑定当前进程到指定GPU
         torch.cuda.set_device(local_rank)
-        device = torch.device(f"cuda: {local_rank}")
+        device = torch.device(f"cuda:{local_rank}")
         # 获取全局进程数和当前进程的全局 ID
         world_size = dist.get_world_size()
         global_rank = dist.get_rank()

@@ -87,7 +87,8 @@ class Trainer:
                     # 为了以后单卡能正常读取，必须用 `model.module` 保存原模型权重
                     model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
                     torch.save(model_to_save.state_dict(), save_path)
-                    print(f"🌟 发现更低的验证集 Loss，已保存权重至: {save_path}")
+                    if self.is_main_process:
+                        print(f"🌟 发现更低的验证集 Loss，已保存权重至: {save_path}")
 
             # 4. 学习率调度器更新
             if self.scheduler:
