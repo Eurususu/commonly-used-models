@@ -3,6 +3,8 @@ import sys
 import yaml
 import argparse
 import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -41,23 +43,67 @@ def main():
     # 1. 解析命令行参数与 YAML 配置
     args = parse_args()
     cfg = load_yaml(args.config)
-    
-    print(f"{'='*50}")
-    print(f"🔥 初始化训练任务 | 配置: {args.config}")
-    print(f"🖥️  设备: {args.device} | Epochs: {args.epochs} | 保存至: {args.save_dir}")
-    print(f"{'='*50}\n")
 
     # ==========================================
-    # 2. 组装数据流 (Data)
+    # 0. 🌐 DDP 分布式环境初始化
     # ==========================================
-    print("📦 正在构建数据流...")
+    # torchrun 会自动注入 LOCAL_RANK 环境变量。如果没有，说明是普通单卡运行 (-1)
+    local_rank = int(os.environ.get('LOCAL_RANK', -1))
+    is_distributed = local_rank != -1
+
+    if is_distributed:
+        # 初始化进程组 (使用 nccl 后端，N卡专属最高效通信)
+        dist.init_process_group(backend="nccl")
+        # 绑定当前进程到指定GPU
+        torch.cuda.set_device(local_rank)
+        device = torch.device(f"cuda: {local_rank}")
+        # 获取全局进程数和当前进程的全局 ID
+        world_size = dist.get_world_size()
+        global_rank = dist.get_rank()
+    else:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        world_size = 1
+        global_rank = 0
+
+    # 为了避免多卡同时打印日志导致屏幕爆炸，我们只允许 Rank 0 (主进程) 打印
+    is_main_process = global_rank == 0
+
+    if is_main_process:
+        print(f"{'='*50}")
+        print(f"🔥 初始化训练任务 | 配置: {args.config}")
+        print(f"🖥️  设备模式: {'DDP 多卡分布式' if is_distributed else '单卡/CPU'} | GPU数量: {world_size}")
+        print(f"📦  Epochs: {args.epochs} | 保存至: {args.save_dir}")
+        print(f"{'='*50}\n")
+
+    # ==========================================
+    # 1. 组装算法核心 (Model)
+    # ==========================================
+    if is_main_process: print("🧠 正在构建模型...")
+    model = build_model(cfg['model']['name'], **cfg['model'].get('kwargs', {}))
+    model = model.to(device)
+
+    # 🌟 核心魔法：如果是多卡，使用 DDP 包裹模型
+    if is_distributed:
+        # 将普通的 BatchNorm 转换为跨卡同步的 SyncBatchNorm
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        # 包裹 DDP
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    
+
+
+    # ==========================================
+    # 2. 组装数据流 (Data) - 需要注入 DDP 状态
+    # ==========================================
+    if is_main_process: print("📦 正在构建数据流...")
     # 训练集
     train_transforms = build_transforms(cfg['data'].get('train_transforms', []))
     cfg['data']['train_dataset']['kwargs']['transforms'] = train_transforms
+    # ⚠️ 注意：这里我们给 create_dataloader 多传了一个 is_distributed 标志
     train_loader = create_dataloader(
         dataset_name=cfg['data']['train_dataset']['name'],
         dataset_cfg=cfg['data']['train_dataset']['kwargs'],
-        loader_cfg=cfg['data']['train_loader']
+        loader_cfg=cfg['data']['train_loader'],
+        is_distributed=is_distributed # 新增参数
     )
     
     # 验证集 (可选配置)
@@ -68,20 +114,15 @@ def main():
         val_loader = create_dataloader(
             dataset_name=cfg['data']['val_dataset']['name'],
             dataset_cfg=cfg['data']['val_dataset']['kwargs'],
-            loader_cfg=cfg['data']['val_loader']
+            loader_cfg=cfg['data']['val_loader'],
+            is_distributed=is_distributed # 新增参数
         )
 
     # ==========================================
-    # 3. 组装算法核心 (Model & Loss)
+    # 3. 组装动力系统 (Loss, Optim, Scheduler)
     # ==========================================
-    print("🧠 正在构建模型与损失函数...")
-    model = build_model(cfg['model']['name'], **cfg['model'].get('kwargs', {}))
+    if is_main_process: print("🧠 正在构建损失函数、优化器、调度器...")
     criterion = build_loss(cfg['loss']['name'], **cfg['loss'].get('kwargs', {}))
-
-    # ==========================================
-    # 4. 组装动力系统 (Optim & Scheduler)
-    # ==========================================
-    print("⚙️  正在构建优化器与调度器...")
     optimizer = build_optimizer(
         model.parameters(), 
         cfg['optim']['name'], 
@@ -97,14 +138,15 @@ def main():
         )
 
     # ==========================================
-    # 5. 断点恢复 (可选)
+    # 4. 断点恢复 (可选)
     # ==========================================
     if args.resume and os.path.exists(args.resume):
-        print(f"⏳ 正在从 {args.resume} 恢复权重...")
-        model.load_state_dict(torch.load(args.resume, map_location=args.device))
+        if is_main_process: print(f"⏳ 正在从 {args.resume} 恢复权重...")
+        # 注意：多卡恢复时，需将权重映射到当前卡的 device
+        model.load_state_dict(torch.load(args.resume, map_location=device))
 
     # ==========================================
-    # 6. 拉起引擎，开始训练！
+    # 5. 拉起引擎，开始训练！
     # ==========================================
     trainer = Trainer(
         model=model,
@@ -113,11 +155,16 @@ def main():
         criterion=criterion,
         optimizer=optimizer,
         scheduler=scheduler,
-        device=args.device,
-        save_dir=args.save_dir
+        device=device,
+        save_dir=args.save_dir,
+        is_main_process=is_main_process # 传入引擎，用来控制日志打印和权重保存
     )
     
     trainer.train(epochs=args.epochs)
+
+    # 销毁分布式环境
+    if is_distributed:
+        dist.destroy_process_group()
 
 if __name__ == "__main__":
     main()
