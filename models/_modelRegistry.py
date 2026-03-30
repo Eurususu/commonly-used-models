@@ -5,6 +5,8 @@ from utils.registry import Registry
 # 创建模型注册表
 MODEL_REGISTRY = Registry("models")
 
+__all__ = ['register_model', 'build_model', 'list_models']
+
 
 def register_model(name: str = None):
     """装饰器：注册模型到全局注册表"""

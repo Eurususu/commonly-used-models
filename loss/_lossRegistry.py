@@ -2,6 +2,8 @@ from utils.registry import Registry
 
 LOSS_REGISTRY = Registry("losses")
 
+__all__ = ['register_loss', 'build_loss', 'list_losses']
+
 def register_loss(name: str = None):
     """装饰器：注册损失函数到全局注册表"""
     return LOSS_REGISTRY.register(name)

@@ -1,6 +1,8 @@
 import torch
 from tqdm import tqdm
 
+__all__ = ['Evaluator']
+
 class Evaluator:
     """验证/评估引擎"""
     def __init__(self, model, dataloader, criterion, device):

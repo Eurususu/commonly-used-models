@@ -1,6 +1,8 @@
 import torch
 from PIL import Image
 
+__all__ = ['Inferencer']
+
 class Inferencer:
     """单张图像推理引擎"""
     def __init__(self, model, transforms, device, checkpoint_path=None):

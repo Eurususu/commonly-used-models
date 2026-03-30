@@ -1,6 +1,8 @@
 import torch.nn as nn
 from ._lossRegistry import register_loss
 
+__all__ = []
+
 # 常用损失函数注册
 register_loss("L1Loss")(nn.L1Loss)
 register_loss("MSELoss")(nn.MSELoss)

@@ -3,6 +3,8 @@ import torchvision.transforms as T
 
 TRANSFORMS_REGISTRY = Registry('transforms')
 
+__all__ = ['register_transform', 'build_transforms', 'list_transforms']
+
 def build_transforms(transform_cfgs: list):
     """
     根据配置列表构建数据增强 Compose 流水线

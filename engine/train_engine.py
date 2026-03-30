@@ -5,6 +5,8 @@ from .val_engine import Evaluator
 
 from torch.utils.tensorboard import SummaryWriter
 
+__all__ =['Trainer']
+
 class Trainer:
     """核心训练引擎"""
     def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, save_dir="checkpoints", is_main_process=True):

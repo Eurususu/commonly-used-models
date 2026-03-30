@@ -1,6 +1,8 @@
 import torch.optim.lr_scheduler as lr_scheduler
 from ._schedulerRegistry import register_scheduler
 
+__all__ = []
+
 # 1. 阶梯下降 (每隔 step_size 个 epoch，学习率乘以 gamma)
 register_scheduler("step_lr")(lr_scheduler.StepLR)
 

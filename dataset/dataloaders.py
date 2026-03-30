@@ -3,6 +3,8 @@ from torch.utils.data import DataLoader
 from ._datasetRegistry import build_dataset
 from torch.utils.data.distributed import DistributedSampler
 
+__all__ = ['create_dataloader']
+
 def create_dataloader(dataset_name: str, dataset_cfg: dict, loader_cfg: dict, is_distributed=False):
     """
     统一的数据加载器构建工厂

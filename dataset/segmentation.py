@@ -6,6 +6,8 @@ from torch.utils.data import Dataset
 # from PIL import Image 
 from ._datasetRegistry import register_dataset
 
+__all__ = ["SegmentationDataset"]
+
 @register_dataset("seg_dataset")
 class SegmentationDataset(Dataset):
     """

@@ -4,8 +4,10 @@ import torch.nn as nn
 import layers
 from ._modelRegistry import register_model
 
+__all__ = ["DynamicGraphModel"]
+
 @register_model("dynamic_graph_model")
-class DynamicSeqModel(nn.Module):
+class DynamicGraphModel(nn.Module):
     '''
     基于配置文件的动态 DAG (有向无环图) 网络拼接器
     支持残差连接、特征融合等多分支结构

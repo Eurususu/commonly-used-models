@@ -2,6 +2,8 @@ from utils.registry import Registry
 
 OPTIM_REGISTRY = Registry("optimizers")
 
+__all__ = ['register_optimizer', 'build_optimizer', 'list_optimizers']
+
 def register_optimizer(name: str = None):
     """装饰器：注册优化器到全局注册表"""
     return OPTIM_REGISTRY.register(name)

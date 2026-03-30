@@ -5,6 +5,9 @@ from PIL import Image
 from ._datasetRegistry import register_dataset
 
 
+__all__ = ["ClassificationDataset"]
+
+
 @register_dataset("cls_dataset")
 class ClassificationDataset(Dataset):
     """

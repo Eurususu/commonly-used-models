@@ -7,6 +7,8 @@ from typing import Optional, Dict, Any, Callable
 # 统一接口：BaseModel
 # ============================================================
 
+__all__ = ["BaseModel"]
+
 class BaseModel(nn.Module):
     """所有模型的基类，定义统一接口"""
 

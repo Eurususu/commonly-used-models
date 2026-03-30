@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from .cross_entropy import LabelSmoothingCrossEntropy
 from ._lossRegistry import register_loss
 
+__all__ = ["JsdCrossEntropy"]
+
 
 @register_loss("JsdCrossEntropy")
 class JsdCrossEntropy(nn.Module):

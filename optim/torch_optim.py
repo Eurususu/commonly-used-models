@@ -1,6 +1,8 @@
 import torch.optim as optim
 from ._optimRegistry import register_optimizer
 
+__all__ = []
+
 register_optimizer("SGD")(optim.SGD)
 register_optimizer("Adam")(optim.Adam)
 register_optimizer("RMSprop")(optim.RMSprop)

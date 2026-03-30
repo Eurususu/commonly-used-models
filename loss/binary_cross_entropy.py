@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ._lossRegistry import register_loss
 
+__all__ = ['BinaryCrossEntropy']
+
 @register_loss("BinaryCrossEntropy")
 class BinaryCrossEntropy(nn.Module):
     """ BCE with optional one-hot from dense targets, label smoothing, thresholding

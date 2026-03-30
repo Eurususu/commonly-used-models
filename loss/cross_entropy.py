@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ._lossRegistry import register_loss
 
+__all__ = ['LabelSmoothingCrossEntropy', 'SoftTargetCrossEntropy']
+
 @register_loss("LabelSmoothingCrossEntropy")
 class LabelSmoothingCrossEntropy(nn.Module):
     """ NLL loss with label smoothing.

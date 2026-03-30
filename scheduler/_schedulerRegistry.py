@@ -2,6 +2,8 @@ from utils.registry import Registry
 
 SCHEDULER_REGISTRY = Registry("schedules")
 
+__all__ = ['register_scheduler', 'build_scheduler', 'list_schedulers']
+
 def register_scheduler(name: str = None):
     """注册学习率调度器"""
     return SCHEDULER_REGISTRY.register(name)
