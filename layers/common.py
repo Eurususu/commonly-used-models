@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import logging
 
 __all__ = ["Concat", "Add"]
 
@@ -8,6 +9,8 @@ class Concat(nn.Module):
     def __init__(self, dim=1, **kwargs):
         super().__init__()
         self.dim = dim
+        if kwargs:
+            logging.warning(f"Concat 层收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
     def forward(self, x: list | tuple):
         # x 必须是一个包含多个 tensor 的列表，例如 [tensor1, tensor2]
@@ -20,6 +23,8 @@ class Add(nn.Module):
         super().__init__()
         self.alpha = alpha # 显示传入alpha
         # self.add_kwargs = kwargs # 隐式传入alpha，需要翻阅文档，知道有哪些参数可以传入
+        if kwargs:
+            logging.warning(f"Add 层收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
     def forward(self, x: list | tuple):
         if len(x) != 2:

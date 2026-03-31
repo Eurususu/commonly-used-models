@@ -23,11 +23,16 @@ def build_transforms(transform_cfgs: list):
         
     transform_list = []
     for cfg in transform_cfgs:
-        name = cfg.get("name").lower()
+        name = cfg.get("name")
+        if not name:
+            raise KeyError(f"❌ Transform 配置错误：缺少 'name' 字段！当前配置项: {cfg}")
+        name = name.lower()
         kwargs = cfg.get("kwargs", {})
-        
-        if name not in TRANSFORMS_REGISTRY.keys():
-            raise ValueError(f"未知的 Transform: {name}。可用列表: {TRANSFORMS_REGISTRY.keys()}")
+
+        # 直接查底层的字典，比查 keys() 列表速度更快 (O(1) vs O(n))
+        if name not in TRANSFORMS_REGISTRY._module_dict:
+            available = ", ".join(TRANSFORMS_REGISTRY.keys())
+            raise ValueError(f"❌ 未知的 Transform: '{name}'。可用列表: [{available}]")
             
         # 拿到具体的类并实例化
         transform_cls = TRANSFORMS_REGISTRY._module_dict[name]
@@ -43,6 +48,6 @@ def list_transforms() -> list:
     return TRANSFORMS_REGISTRY.keys()
 
 
-def register_transform(name: str = None):
+def register_transform(name: str = None, force: bool = False):
     """注册数据变换"""
-    return TRANSFORMS_REGISTRY.register(name)
+    return TRANSFORMS_REGISTRY.register(name=name, force=force)

@@ -12,6 +12,6 @@ def list_datasets() -> list:
     """返回所有数据集名称"""
     return DATASET_REGISTRY.keys()
 
-def register_dataset(name: str = None):
+def register_dataset(name: str = None, force: bool = False):
     """注册数据集"""
-    return DATASET_REGISTRY.register(name)
+    return DATASET_REGISTRY.register(name=name, force=force)

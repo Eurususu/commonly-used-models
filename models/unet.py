@@ -5,14 +5,17 @@ import torch
 import torch.nn as nn
 from ._modelRegistry import register_model
 from .BaseModel import BaseModel
+import logging
 
 __all__ = ['UNet', 'ResUNet']
 
 
 @register_model("unet")
 class UNet(BaseModel):
-    def __init__(self, num_channels=3, num_classes=1, bilinear=False):
+    def __init__(self, num_channels=3, num_classes=1, bilinear=False, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"UNet 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.bilinear = bilinear
@@ -71,8 +74,10 @@ class UNet(BaseModel):
 
 @register_model("resunet")
 class ResUNet(BaseModel):
-    def __init__(self, num_channels=3, num_classes=1, bilinear=False):
+    def __init__(self, num_channels=3, num_classes=1, bilinear=False, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"ResUNet 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.bilinear = bilinear

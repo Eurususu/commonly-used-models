@@ -4,9 +4,9 @@ OPTIM_REGISTRY = Registry("optimizers")
 
 __all__ = ['register_optimizer', 'build_optimizer', 'list_optimizers']
 
-def register_optimizer(name: str = None):
+def register_optimizer(name: str = None, force: bool = False):
     """装饰器：注册优化器到全局注册表"""
-    return OPTIM_REGISTRY.register(name)
+    return OPTIM_REGISTRY.register(name=name, force=force)
 
 def build_optimizer(params, name: str, **kwargs):
     """根据名称构建优化器"""
@@ -16,7 +16,7 @@ def build_optimizer(params, name: str, **kwargs):
     name = name.lower()
     if name not in OPTIM_REGISTRY._module_dict:
         available = ", ".join(OPTIM_REGISTRY.keys())
-        raise ValueError(f"❌ 未知优化器: {name}。可用选项: {available}")
+        raise ValueError(f"❌ 未知优化器: '{name}'。可用选项: [{available}]")
     
     # 拿到优化器类
     optimizer_cls = OPTIM_REGISTRY._module_dict[name]

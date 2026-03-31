@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 
 __all__ = [
     'DoubleConv',
@@ -17,6 +18,8 @@ class DoubleConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, mid_channels=None, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"DoubleConv 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
@@ -37,6 +40,8 @@ class Down(nn.Module):
 
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"Down 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
             DoubleConv(in_channels, out_channels)
@@ -51,6 +56,8 @@ class Up(nn.Module):
 
     def __init__(self, in_channels, out_channels, bilinear=True, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"Up 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         if bilinear:
             # self.up = nn.Sequential(
@@ -77,6 +84,8 @@ class Up(nn.Module):
 class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(OutConv, self).__init__()
+        if kwargs:
+            logging.warning(f"OutConv 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x):

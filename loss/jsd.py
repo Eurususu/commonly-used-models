@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from .cross_entropy import LabelSmoothingCrossEntropy
 from ._lossRegistry import register_loss
+import logging
 
 __all__ = ["JsdCrossEntropy"]
 
@@ -18,8 +19,10 @@ class JsdCrossEntropy(nn.Module):
 
     Hacked together by / Copyright 2020 Ross Wightman
     """
-    def __init__(self, num_splits=3, alpha=12, smoothing=0.1):
+    def __init__(self, num_splits=3, alpha=12, smoothing=0.1, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"JsdCrossEntropy 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.num_splits = num_splits
         self.alpha = alpha
         if smoothing is not None and smoothing > 0:

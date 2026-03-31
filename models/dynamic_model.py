@@ -3,6 +3,7 @@ import inspect
 import torch.nn as nn
 import layers
 from ._modelRegistry import register_model
+import logging
 
 __all__ = ["DynamicGraphModel"]
 
@@ -13,8 +14,10 @@ class DynamicGraphModel(nn.Module):
     支持残差连接、特征融合等多分支结构
     '''
 
-    def __init__(self, layers_cfg):
+    def __init__(self, layers_cfg, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"DynamicGraphModel 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         # 使用 ModuleList 来容纳所有层，保持它们在网络中的顺序
         self.module_list = nn.ModuleList()
         # 记录每一层的路由来源

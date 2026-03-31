@@ -5,7 +5,7 @@ __all__ = ["AddGaussianNoise"]
 
 @register_transform("AddGaussianNoise")
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1.):
+    def __init__(self, mean=0., std=1., **kwargs):
         self.std = std
         self.mean = mean
         

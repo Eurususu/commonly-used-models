@@ -5,6 +5,7 @@ Modified from https://github.com/pytorch/vision.git
 import torch.nn as nn
 from ._modelRegistry import register_model
 from .BaseModel import BaseModel
+import logging
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -16,8 +17,10 @@ class VGG(BaseModel):
     '''
     VGG model
     '''
-    def __init__(self, features, num_classes=10):
+    def __init__(self, features, num_classes=10, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"VGG 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
@@ -86,49 +89,65 @@ cfg = {
 
 
 @register_model("vgg11")
-def vgg11(num_classes=10):
+def vgg11(num_classes=10, **kwargs):
     """VGG 11-layer model (configuration "A")"""
+    if kwargs:
+        logging.warning(f"vgg11 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['A']), num_classes=num_classes)
 
 
 @register_model("vgg11_bn")
-def vgg11_bn(num_classes=10):
+def vgg11_bn(num_classes=10, **kwargs):
     """VGG 11-layer model (configuration "A") with batch normalization"""
+    if kwargs:
+        logging.warning(f"vgg11_bn 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['A'], batch_norm=True), num_classes=num_classes)
 
 
 @register_model("vgg13")
-def vgg13(num_classes=10):
+def vgg13(num_classes=10, **kwargs):
     """VGG 13-layer model (configuration "B")"""
+    if kwargs:
+        logging.warning(f"vgg13 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['B']), num_classes=num_classes)
 
 
 @register_model("vgg13_bn")
-def vgg13_bn(num_classes=10):
+def vgg13_bn(num_classes=10, **kwargs):
     """VGG 13-layer model (configuration "B") with batch normalization"""
+    if kwargs:
+        logging.warning(f"vgg13_bn 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['B'], batch_norm=True), num_classes=num_classes)
 
 
 @register_model("vgg16")
-def vgg16(num_classes=10):
+def vgg16(num_classes=10, **kwargs):
     """VGG 16-layer model (configuration "D")"""
+    if kwargs:
+        logging.warning(f"vgg16 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['D']), num_classes=num_classes)
 
 
 @register_model("vgg16_bn")
-def vgg16_bn(num_classes=10):
+def vgg16_bn(num_classes=10, **kwargs):
     """VGG 16-layer model (configuration "D") with batch normalization"""
+    if kwargs:
+        logging.warning(f"vgg16_bn 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['D'], batch_norm=True), num_classes=num_classes)
 
 
 @register_model("vgg19")
-def vgg19(num_classes=10):
+def vgg19(num_classes=10, **kwargs):
     """VGG 19-layer model (configuration "E")"""
+    if kwargs:
+        logging.warning(f"vgg19 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['E']), num_classes=num_classes)
 
 
 @register_model("vgg19_bn")
-def vgg19_bn(num_classes=10):
+def vgg19_bn(num_classes=10, **kwargs):
     """VGG 19-layer model (configuration 'E') with batch normalization"""
+    if kwargs:
+        logging.warning(f"vgg19_bn 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return VGG(make_layers(cfg['E'], batch_norm=True), num_classes=num_classes)
 

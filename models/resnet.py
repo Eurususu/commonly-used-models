@@ -12,14 +12,17 @@ import torch.nn as nn
 from layers import BasicBlock, BottleNeck
 from ._modelRegistry import register_model
 from .BaseModel import BaseModel
+import logging
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
 
 class ResNet(BaseModel):
 
-    def __init__(self, block, num_block, num_classes=100):
+    def __init__(self, block, num_block, num_classes=100, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"ResNet 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         self.in_channels = 64
 
@@ -96,32 +99,42 @@ class ResNet(BaseModel):
         return output
 
 @register_model("resnet18")
-def resnet18(num_classes=100):
+def resnet18(num_classes=100, **kwargs):
     """ return a ResNet 18 object
     """
+    if kwargs:
+        logging.warning(f"resnet18 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
 
 @register_model("resnet34")
-def resnet34(num_classes=100):
+def resnet34(num_classes=100, **kwargs):
     """ return a ResNet 34 object
     """
+    if kwargs:
+        logging.warning(f"resnet34 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
 
 @register_model("resnet50")
-def resnet50(num_classes=100):
+def resnet50(num_classes=100, **kwargs):
     """ return a ResNet 50 object
     """
+    if kwargs:
+        logging.warning(f"resnet50 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return ResNet(BottleNeck, [3, 4, 6, 3], num_classes=num_classes)
 
 @register_model("resnet101")
-def resnet101(num_classes=100):
+def resnet101(num_classes=100, **kwargs):
     """ return a ResNet 101 object
     """
+    if kwargs:
+        logging.warning(f"resnet101 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return ResNet(BottleNeck, [3, 4, 23, 3], num_classes=num_classes)
 
 @register_model("resnet152")
-def resnet152(num_classes=100):
+def resnet152(num_classes=100, **kwargs):
     """ return a ResNet 152 object
     """
+    if kwargs:
+        logging.warning(f"resnet152 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
     return ResNet(BottleNeck, [3, 8, 36, 3], num_classes=num_classes)
 

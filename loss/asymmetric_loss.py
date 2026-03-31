@@ -1,13 +1,16 @@
 import torch
 import torch.nn as nn
 from ._lossRegistry import register_loss
+import logging
 
 __all__ = ['AsymmetricLossMultiLabel', 'AsymmetricLossSingleLabel']
 
 @register_loss("AsymmetricLossMultiLabel")
 class AsymmetricLossMultiLabel(nn.Module):
-    def __init__(self, gamma_neg=4, gamma_pos=1, clip=0.05, eps=1e-8, disable_torch_grad_focal_loss=False):
+    def __init__(self, gamma_neg=4, gamma_pos=1, clip=0.05, eps=1e-8, disable_torch_grad_focal_loss=False, **kwargs):
         super(AsymmetricLossMultiLabel, self).__init__()
+        if kwargs:
+            logging.warning(f"AsymmetricLossMultiLabel 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
@@ -55,8 +58,11 @@ class AsymmetricLossMultiLabel(nn.Module):
 
 @register_loss("AsymmetricLossSingleLabel")
 class AsymmetricLossSingleLabel(nn.Module):
-    def __init__(self, gamma_pos=1, gamma_neg=4, eps: float = 0.1, reduction='mean'):
+    def __init__(self, gamma_pos=1, gamma_neg=4, eps: float = 0.1, reduction='mean', **kwargs):
         super(AsymmetricLossSingleLabel, self).__init__()
+
+        if kwargs:
+            logging.warning(f"AsymmetricLossSingleLabel 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         self.eps = eps
         self.logsoftmax = nn.LogSoftmax(dim=-1)

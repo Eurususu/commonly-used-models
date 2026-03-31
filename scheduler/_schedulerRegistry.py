@@ -4,9 +4,9 @@ SCHEDULER_REGISTRY = Registry("schedules")
 
 __all__ = ['register_scheduler', 'build_scheduler', 'list_schedulers']
 
-def register_scheduler(name: str = None):
+def register_scheduler(name: str = None, force: bool = False):
     """注册学习率调度器"""
-    return SCHEDULER_REGISTRY.register(name)
+    return SCHEDULER_REGISTRY.register(name=name, force=force)
 
 def build_scheduler(optimizer, name: str, **kwargs):
     """

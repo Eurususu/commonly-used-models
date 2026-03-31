@@ -3,6 +3,7 @@
 import torch
 from .resnet_layers import BasicBlock
 from .unet_layers import DoubleConv
+import logging
 
 import torch.nn as nn
 
@@ -17,6 +18,8 @@ class ResDown(nn.Module):
 
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"ResDown 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
             BasicBlock(in_channels, out_channels)
@@ -31,6 +34,8 @@ class ResUp(nn.Module):
 
     def __init__(self, in_channels, out_channels, bilinear=True, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"ResUp 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)

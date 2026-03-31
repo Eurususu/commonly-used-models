@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ._lossRegistry import register_loss
+import logging
 
 __all__ = ['BinaryCrossEntropy']
 
@@ -24,8 +25,11 @@ class BinaryCrossEntropy(nn.Module):
             reduction: str = 'mean',
             sum_classes: bool = False,
             pos_weight: Optional[Union[torch.Tensor, float]] = None,
+            **kwargs
     ):
         super(BinaryCrossEntropy, self).__init__()
+        if kwargs:
+            logging.warning(f"BinaryCrossEntropy 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         assert 0. <= smoothing < 1.0
         if pos_weight is not None:
             if not isinstance(pos_weight, torch.Tensor):

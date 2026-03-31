@@ -4,9 +4,9 @@ LOSS_REGISTRY = Registry("losses")
 
 __all__ = ['register_loss', 'build_loss', 'list_losses']
 
-def register_loss(name: str = None):
+def register_loss(name: str = None, force: bool = False):
     """装饰器：注册损失函数到全局注册表"""
-    return LOSS_REGISTRY.register(name)
+    return LOSS_REGISTRY.register(name=name, force=force)
 
 def build_loss(name: str, **kwargs):
     """根据名称构建损失函数"""

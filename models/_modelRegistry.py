@@ -8,9 +8,9 @@ MODEL_REGISTRY = Registry("models")
 __all__ = ['register_model', 'build_model', 'list_models']
 
 
-def register_model(name: str = None):
+def register_model(name: str = None, force: bool = False):
     """装饰器：注册模型到全局注册表"""
-    return MODEL_REGISTRY.register(name)
+    return MODEL_REGISTRY.register(name=name, force=force)
 
 
 def build_model(name: str, **kwargs) -> nn.Module:

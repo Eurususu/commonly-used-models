@@ -2,6 +2,7 @@
 
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 
 __all__ = [
     'BasicBlock',
@@ -16,6 +17,9 @@ class BasicBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride=1, **kwargs):
         super().__init__()
+
+        if kwargs:
+            logging.warning(f"BasicBlock 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
 
         self.residual_function = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
@@ -44,6 +48,8 @@ class BottleNeck(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride=1, **kwargs):
         super().__init__()
+        if kwargs:
+            logging.warning(f"BottleNeck 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
         self.residual_function = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
