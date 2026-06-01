@@ -2,7 +2,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch
 from torch import Tensor
-from .utils import cat_keep_shapes, uncat_with_shapes
+from utils.cat_uncat import cat_keep_shapes, uncat_with_shapes
 from typing import List, Tuple
 
 __all__ = [

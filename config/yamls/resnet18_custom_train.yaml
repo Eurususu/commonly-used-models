@@ -1,3 +1,4 @@
+task: "train_classification"
 data:
   train_transforms: [
       {"name": "resize", "kwargs": {"size": [224, 224]}},

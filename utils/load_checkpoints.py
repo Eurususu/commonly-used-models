@@ -6,7 +6,8 @@ def load_pretrained_weights(model: torch.nn.Module, weight_path: str) -> torch.n
     # 1. 把权重加载到 CPU 内存中（防止直接加载到 GPU 导致显存峰值爆炸）
     checkpoint = torch.load(weight_path, map_location="cpu")
 
-    inspect_struct(checkpoint)
+    # 分析权重的数据结构
+    # inspect_struct(checkpoint)
     
     # 2. 剥离外壳：寻找真正的 state_dict
     # 官方发布的 checkpoint 经常是一个大字典，包含 epoch、optimizer 等信息

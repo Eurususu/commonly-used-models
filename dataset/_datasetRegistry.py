@@ -4,9 +4,9 @@ DATASET_REGISTRY = Registry("datasets")
 
 __all__ = ['register_dataset', 'build_dataset', 'list_datasets']
 
-def build_dataset(name: str, **kwargs):
+def build_dataset(name: str, *args, **kwargs):
     """根据名称构建数据集"""
-    return DATASET_REGISTRY.build(name, **kwargs)
+    return DATASET_REGISTRY.build(name, *args, **kwargs)
 
 def list_datasets() -> list:
     """返回所有数据集名称"""

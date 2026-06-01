@@ -1,9 +1,17 @@
 from utils.registry import Registry
-import torchvision.transforms as T
 
 TRANSFORMS_REGISTRY = Registry('transforms')
 
 __all__ = ['register_transform', 'build_transforms', 'list_transforms']
+
+class CommonCompose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, image, target=None):
+        for t in self.transforms:
+            image, target = t(image, target)
+        return image, target
 
 def build_transforms(transform_cfgs: list):
     """
@@ -39,7 +47,7 @@ def build_transforms(transform_cfgs: list):
         transform_list.append(transform_cls(**kwargs))
         
     # 用 torchvision 的 Compose 把它们串起来
-    return T.Compose(transform_list)
+    return CommonCompose(transform_list)
 
 
 

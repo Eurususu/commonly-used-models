@@ -8,7 +8,7 @@ def register_scheduler(name: str = None, force: bool = False):
     """注册学习率调度器"""
     return SCHEDULER_REGISTRY.register(name=name, force=force)
 
-def build_scheduler(optimizer, name: str, **kwargs):
+def build_scheduler(optimizer, name: str, *args, **kwargs):
     """
     学习率调度器专属工厂函数
     注意：第一个参数必须接收已经实例化的 optimizer 对象
@@ -28,7 +28,7 @@ def build_scheduler(optimizer, name: str, **kwargs):
     scheduler_cls = SCHEDULER_REGISTRY._module_dict[name]
     
     # 将 optimizer 和额外的 kwargs 一起传进去实例化
-    return scheduler_cls(optimizer, **kwargs)
+    return scheduler_cls(optimizer, *args, **kwargs)
 
 
 def list_schedulers() -> list:

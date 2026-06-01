@@ -1,0 +1,174 @@
+task: "train_detection"
+
+# ==========================================
+# 1. 数据配置 (Data) - 针对目标检测适配
+# ==========================================
+data:
+  train_transforms:
+    # 1. 像素级增强：色彩抖动 (概率 0.5)
+    # 注意：为了支持概率，你可能需要在你的 ColorJitter 里包装一个 random.random() < p 的判断
+    - name: "color_jitter"
+      kwargs:
+        p: 0.5
+        brightness: 0.4
+        contrast: 0.4
+        saturation: 0.4
+        hue: 0.1
+
+    # 2. 空间级增强：水平翻转 (概率 0.5)
+    - name: "random_horizontal_flip"
+      kwargs: { "p": 0.5 }
+
+    # 3. 核心大招：随机二选一 (Random Select)
+    # 每次前向传播时，有 50% 的概率走 branch_a，50% 走 branch_b
+    - name: "random_select"
+      kwargs:
+        p: 0.5
+        # 路径 A：纯多尺度 Resize
+        branch_a:
+          - name: "random_resize"
+            kwargs:
+              sizes: [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
+              max_size: 1333
+
+        # 路径 B：大尺度缩放 -> 极致局部裁剪 -> 重新多尺度缩放
+        branch_b:
+          - name: "random_resize"
+            kwargs:
+              sizes: [400, 500, 600]
+          - name: "random_size_crop" # 相比于固定大小，随机大小裁剪泛化更好
+            kwargs:
+              min_size: 384
+              max_size: 600
+          - name: "random_resize"
+            kwargs:
+              sizes: [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
+              max_size: 1333
+
+    # 4. 结尾标准化：转为 Tensor 并归一化
+    - name: "to_tensor"
+      kwargs: {}
+    - name: "normalize"
+      kwargs:
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+    # 5. 🌟 新增：格式化目标框 (必须放在最后，依赖 ToTensor 的输出)
+    - name: "format_detr"
+      kwargs: {}
+  
+  train_dataset:
+    name: "det_coco_dataset" # 👈 替换为你的目标检测数据集名字 (如 COCO 格式)
+    kwargs: 
+      data_dir: "/home/jia/dataset/coco2017/images/train2017"
+      ann_file: "/home/jia/dataset/coco2017/annotations/instances_train2017.json"
+
+  val_transforms: [
+      {"name": "resize", "kwargs": {"size": [800, 800]}},
+      {"name": "to_tensor", "kwargs": {}},
+      {"name": "normalize", "kwargs": {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}}
+    ]
+
+  val_dataset:
+    name: "det_coco_dataset"
+    kwargs:
+      data_dir: "/home/jia/dataset/coco2017/images/val2017"
+      ann_file: "/home/jia/dataset/coco2017/annotations/instances_val2017.json"
+
+  train_loader:
+    batch_size: 2  # 👈 DETR 极其消耗显存，通常单卡 Batch Size 为 2 或 4
+    shuffle: true
+    num_workers: 4 # DataLoader 进程数，根据你的 CPU 核心数调整
+
+
+  val_loader:
+    batch_size: 2
+    shuffle: false
+    num_workers: 4
+
+# ==========================================
+# 2. 模型核心配置 (Model) - DINOv3 DETR
+# ==========================================
+model: 
+  name: "dinov3_det"
+  backbone_name: "dinov3_small" 
+  
+  kwargs:
+    # 1. 基础网络与维度配置
+    num_classes: 80
+    hidden_dim: 256
+    num_feature_levels: 1
+
+    # 2. 骨干网络参数
+    position_embedding: "sine"  
+    blocks_to_train: null       
+    layers_to_use: 1
+    backbone_use_layernorm: false
+    n_windows_sqrt: 0
+
+    # 3. Transformer 架构参数
+    nheads: 8
+    add_transformer_encoder: false
+    num_encoder_layers: 0
+    norm_type: "pre_norm"       
+    decoder_type: "global_rpe_decomp"
+    reparam: true               
+
+    # 3.5 Decoder 与 RPE 高阶配置
+    dec_layers: 6
+    look_forward_twice: true
+    decoder_use_checkpoint: false
+    decoder_rpe_hidden_dim: 512
+    decoder_rpe_type: "abs_log8"
+    dim_feedforward: 2048
+    dropout: 0.1
+    activation: "relu"
+
+    # 4. 目标查询与两阶段配置
+    two_stage: true
+    num_queries_one2one: 300
+    num_queries_one2many: 0     
+    mixed_selection: false
+
+    # 5. Proposal 网格与尺度配置
+    proposal_feature_levels: 1
+    proposal_in_stride: 16
+    proposal_tgt_strides: [16]
+    proposal_min_size: 50.0
+
+    # 6. 损失函数与后处理
+    aux_loss: true
+    with_box_refine: true
+
+# ==========================================
+# 3. 损失函数配置 (Loss) - 匈牙利匹配与集合损失
+# ==========================================
+loss:
+  name: "set_criterion" # 👈 调用上一回合写的 DETR 专属 Loss 工厂
+  kwargs:
+    num_classes: 80
+    matcher:
+      class: 2.0
+      bbox: 5.0
+      giou: 2.0
+    losses:
+      loss_ce: 1.0     # Focal Loss 分类权重
+      loss_bbox: 5.0   # L1 坐标回归权重
+      loss_giou: 2.0   # GIoU 框重合度权重
+
+# ==========================================
+# 4. 优化器配置 (Optimizer)
+# ==========================================
+optim: 
+  name: "adamw"
+  kwargs: 
+    lr: 0.0001         # 👈 DETR 的基础学习率通常在 1e-4 左右
+    weight_decay: 0.0001
+
+# ==========================================
+# 5. 学习率调度器配置 (Scheduler)
+# ==========================================
+scheduler: 
+  name: "cosine_annealing"
+  kwargs:
+    T_max: 50          # 假设你要训练 50 个 epoch
+    eta_min: 1.0e-6    # 降到极低的学习率收尾

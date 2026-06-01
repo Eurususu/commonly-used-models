@@ -6,7 +6,7 @@ import math
 import numpy as np
 import torch.nn.functional as F
 from .attention import SelfAttention
-from .utils import cat_keep_shapes, uncat_with_shapes
+from utils.cat_uncat import cat_keep_shapes, uncat_with_shapes
 
 __all__ = [
     'LayerScale',
@@ -16,7 +16,8 @@ __all__ = [
     'RMSNorm',
     'RopePositionEmbedding',
     'SwiGLUFFN',
-    'SelfAttentionBlock'
+    'SelfAttentionBlock',
+    'LayerNorm2D'
 ]
 
 
@@ -707,4 +708,19 @@ class SelfAttentionBlock(nn.Module):
         else:
             raise AssertionError
 
+
+class LayerNorm2D(nn.Module):
+    def __init__(self, normalized_shape, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.ln = norm_layer(normalized_shape) if norm_layer is not None else nn.Identity()
+
+    def forward(self, x):
+        """
+        x: N C H W
+        """
+        x = x.permute(0, 2, 3, 1)
+        x = self.ln(x)
+        x = x.permute(0, 3, 1, 2)
+        return x
+    
 

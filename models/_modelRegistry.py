@@ -13,9 +13,9 @@ def register_model(name: str = None, force: bool = False):
     return MODEL_REGISTRY.register(name=name, force=force)
 
 
-def build_model(name: str, **kwargs) -> nn.Module:
+def build_model(name: str,*args, **kwargs) -> nn.Module:
     """根据名称构建模型"""
-    return MODEL_REGISTRY.build(name, **kwargs)
+    return MODEL_REGISTRY.build(name, *args, **kwargs)
 
 
 def list_models() -> list:
