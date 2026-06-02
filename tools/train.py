@@ -127,9 +127,10 @@ def main():
         backbone_name = cfg['model']['backbone_name']
         backbone = build_model(backbone_name)
         # 在这里把权重直接加载给 Backbone！
-        weight_path = "/home/jia/anktechDrive/研发部/共享/算法模型/dinov3/vit_backbone/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+        weight_path = cfg['model'].get('backbone_weight', None)
         if is_main_process: print(f"⏳ 正在为 Backbone 加载预训练权重...")
-        backbone = load_pretrained_weights(backbone, weight_path)
+        if weight_path is not None and os.path.exists(weight_path):
+            backbone = load_pretrained_weights(backbone, weight_path)
         # 再用已经装好权重的 Backbone，去构建完整的 DETR 模型
         model = build_model(model_name, backbone_model=backbone, args=detr_args)
     else:

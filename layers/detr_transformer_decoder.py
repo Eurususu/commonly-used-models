@@ -64,7 +64,7 @@ class GlobalCrossAttention(nn.Module):
         
         if attn_mask is not None:
             attn_mask = attn_mask.contiguous()
-            
+
         # scaled_dot_product_attention 在底层融合算子并调用 FlashAttention。这极大地降低了显存占用并成倍提升了计算速度。
         # scaled_dot_product_attention 要求 attn_mask 是 float（加法掩码）或 bool（布尔掩码）不能出现int类型
         x = torch.nn.functional.scaled_dot_product_attention(
@@ -423,8 +423,20 @@ class GlobalRpeCrossAttention(nn.Module):
 
         attn_mask = rpe
         if input_padding_mask is not None:
-            attn_mask += input_padding_mask[:, None, None] * -100
-        attn_mask = attn_mask.contiguous()  # to enable efficient attention
+            # 🌟 核心修复 1：将布尔类型的 input_padding_mask 转换为与 query 一致的浮点类型
+            # 这样兼容 AMP 自动混合精度 (float32, float16, bfloat16)，彻底消灭类型冲突崩溃
+            
+            # 🌟 核心修复 2：惩罚值从 -100 改为 -10000.0 (或更稳健的极小值)
+            # 在半精度 (FP16) 下，e^-100 虽然很小，但在某些极端梯度堆积下不够保险，-10000.0 是工业标准
+            pad_mask = input_padding_mask[:, None, None].to(q.dtype) * -10000.0
+
+            # 将黑边的负无穷惩罚，直接加到相对位置偏置 rpe 上
+            attn_mask = attn_mask + pad_mask
+
+            # 以前做法
+            # attn_mask += input_padding_mask[:, None, None] * -100
+        if attn_mask is not None:
+            attn_mask = attn_mask.contiguous()  # to enable efficient attention
 
         x = torch.nn.functional.scaled_dot_product_attention(
             query=q,

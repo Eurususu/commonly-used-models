@@ -90,7 +90,8 @@ data:
 # ==========================================
 model: 
   name: "dinov3_det"
-  backbone_name: "dinov3_small" 
+  backbone_name: "dinov3_small"
+  backbone_weight: "/home/jia/anktechDrive/研发部/共享/算法模型/dinov3/vit_backbone/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
   
   kwargs:
     # 1. 基础网络与维度配置
