@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 
 class BaseTrainer(ABC):
     """通用的基础训练引擎基类"""
-    def __init__(self, model, train_loader, val_loader, optimizer, scheduler, device, save_dir="checkpoints", is_main_process=True):
+    def __init__(self, model, train_loader, val_loader, optimizer, scheduler, 
+                 device, save_dir="checkpoints", is_main_process=True,
+                 clip_max_norm=None):
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -16,6 +18,7 @@ class BaseTrainer(ABC):
         self.device = device
         self.save_dir = save_dir
         self.is_main_process = is_main_process
+        self.clip_max_norm = clip_max_norm # 🌟 绑定到实例属性
         
         self.best_metric = float('-inf') # 统一用一个指标来保存最优模型 (比如 mAP 或 Acc)，越高越好
 
@@ -51,6 +54,16 @@ class BaseTrainer(ABC):
         self.model.train()
         total_loss = 0.0
 
+        num_batches = len(self.train_loader)
+        if num_batches == 0:
+            raise RuntimeError(
+                "🚨 致命错误：训练集 DataLoader 的批次数量为 0！\n"
+                "可能的原因：\n"
+                "1. 数据集目录为空，或读取逻辑导致 0 样本。\n"
+                "2. 训练集总样本数小于 Batch Size，且 DataLoader 开启了 drop_last=True。\n"
+                "请立即检查数据流配置！"
+            )
+
         if hasattr(self.train_loader, 'sampler') and hasattr(self.train_loader.sampler, 'set_epoch'):
             self.train_loader.sampler.set_epoch(epoch)
         
@@ -65,6 +78,10 @@ class BaseTrainer(ABC):
             loss, log_dict = self.train_step(batch)
             
             loss.backward()
+            # 🌟 2. 核心魔法：在 step() 之前执行梯度裁剪！
+            if self.clip_max_norm is not None and self.clip_max_norm > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_max_norm)
+
             self.optimizer.step()
             total_loss += loss.item()
             
@@ -73,11 +90,11 @@ class BaseTrainer(ABC):
 
         return total_loss / len(self.train_loader)
 
-    def train(self, epochs):
+    def train(self, start_epoch, epochs):
         if self.is_main_process:
-            print(f"🔥 开始训练！总 Epoch: {epochs}")
+            print(f"🔥 开始训练！总 Epoch: {epochs}，当前从 Epoch {start_epoch} 启动")
         
-        for epoch in range(1, epochs + 1):
+        for epoch in range(start_epoch, epochs):
             train_loss = self.train_one_epoch(epoch)
             
             if self.is_main_process:
@@ -95,14 +112,35 @@ class BaseTrainer(ABC):
                     if main_metric > self.best_metric:
                         self.best_metric = main_metric
                         save_path = os.path.join(self.save_dir, "best_model.pth")
+                        # 剥离 DDP 外壳，仅保存纯净模型权重给后续推理用
                         model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
                         torch.save(model_to_save.state_dict(), save_path)
                         print(f"🌟 发现更优模型 (Metric: {main_metric:.4f})，已保存至: {save_path}")
 
             if self.scheduler:
-                # 简化处理，统一 step
-                self.scheduler.step()
+                if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    if self.val_loader:
+                        self.scheduler.step(main_metric)
+                    else:
+                        raise ValueError("请传入验证集数据集，以便使用 ReduceLROnPlateau 调度器")
+                else:
+                    # 简化处理，统一 step
+                    self.scheduler.step()
 
-        if self.is_main_process:     
+            # best_model.pth 只保存最优模型权重，
+            # heckpoint_latest.pth 则保存最新的训练状态（包含优化器和调度器），方便断点续训。
+            if self.is_main_process:
+                model_without_ddp = self.model.module if hasattr(self.model, 'module') else self.model
+                checkpoint = {
+                        'epoch': epoch,
+                        'model_state_dict': model_without_ddp.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                    }
+                if self.scheduler:
+                    checkpoint['scheduler_state_dict'] = self.scheduler.state_dict()
+                latest_save_path = os.path.join(self.save_dir, "checkpoint_latest.pth")
+                torch.save(checkpoint, latest_save_path)
+
+        if self.is_main_process:
             print("\n🏁 训练流程圆满结束！")
             self.writer.close()

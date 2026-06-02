@@ -17,16 +17,24 @@ from optim import build_optimizer
 from scheduler import build_scheduler
 from engine import build_task
 from utils.load_checkpoints import load_pretrained_weights
+from utils.set_seed import set_seed
 
 # [🌟 新增] 辅助函数：将字典递归转化为 Namespace 对象 (专为 DETR 准备)
 def dict_to_namespace(d):
+    """
+    将嵌套字典递归转化为 SimpleNamespace 对象。
+    """
     if isinstance(d, dict):
-        for k, v in d.items():
-            d[k] = dict_to_namespace(v)
-        return SimpleNamespace(**d)
+        # 🌟 核心魔法：字典推导式会直接生成一个全新的字典。
+        # 这天然实现了隔离，完全不需要显式调用 .copy()，也绝对不会污染原字典！
+        return SimpleNamespace(**{k: dict_to_namespace(v) for k, v in d.items()})
+    
     elif isinstance(d, list):
+        # 列表推导式同样会生成一个全新的列表
         return [dict_to_namespace(v) for v in d]
+    
     else:
+        # 当遇到 int, float, str 等基础数据类型时，直接返回原值
         return d
 
 
@@ -81,10 +89,20 @@ def main():
     # 为了避免多卡同时打印日志导致屏幕爆炸，我们只允许 Rank 0 (主进程) 打印
     is_main_process = global_rank == 0
 
+    # 从命令行参数或 YAML 中读取 base_seed，默认给个 42
+    base_seed = cfg.get('seed', getattr(args, 'seed', 42))
+
+    # 🔥 核心：让每个 GPU 拥有独立的种子，防止数据增强生成一模一样的随机变换
+    seed = base_seed + global_rank
+
+    # 建议 deterministic=False，保留 cuDNN 加速；发论文需严格复现时改为 True
+    set_seed(seed, deterministic=False)
+
     if is_main_process:
         print(f"{'='*50}")
         print(f"🔥 初始化训练任务 | 配置: {args.config}")
         print(f"🖥️  设备模式: {'DDP 多卡分布式' if is_distributed else '单卡/CPU'} | GPU数量: {world_size}")
+        print(f"🌱 基础随机种子: {base_seed} (当前进程种子: {seed})")
         print(f"📦  Epochs: {args.epochs} | 保存至: {args.save_dir}")
         print(f"{'='*50}\n")
 
@@ -161,7 +179,8 @@ def main():
         dataset_name=cfg['data']['train_dataset']['name'],
         dataset_cfg=cfg['data']['train_dataset']['kwargs'],
         loader_cfg=cfg['data']['train_loader'],
-        is_distributed=is_distributed # 新增参数
+        is_distributed=is_distributed, # 新增参数
+        seed=seed  # 👈 🌟 注入当前进程的种子
     )
     
     # 验证集 (可选配置)
@@ -173,7 +192,8 @@ def main():
             dataset_name=cfg['data']['val_dataset']['name'],
             dataset_cfg=cfg['data']['val_dataset']['kwargs'],
             loader_cfg=cfg['data']['val_loader'],
-            is_distributed=is_distributed # 新增参数
+            is_distributed=is_distributed, # 新增参数
+            seed=seed  # 👈 🌟 注入当前进程的种子
         )
 
     # ==========================================
@@ -198,10 +218,35 @@ def main():
     # ==========================================
     # 4. 断点恢复 (可选)
     # ==========================================
+    start_epoch = 0
     if args.resume and os.path.exists(args.resume):
         if is_main_process: print(f"⏳ 正在从 {args.resume} 恢复权重...")
         # 注意：多卡恢复时，需将权重映射到当前卡的 device
-        model.load_state_dict(torch.load(args.resume, map_location=device))
+        checkpoint = torch.load(args.resume, map_location=device, weights_only=False)
+
+        # 🌟 修复 1：处理 DDP 包装器的 module. 前缀问题
+        # 如果模型已经被 DDP 包装，我们需要提取底层的 model.module 来加载干净的权重
+        model_without_ddp = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+
+        # 兼容性处理：如果你保存的时候存的是纯权重，或者是包含了 'model_state_dict' 的完整字典
+        if 'model_state_dict' in checkpoint:
+            model_without_ddp.load_state_dict(checkpoint['model_state_dict'])
+        else:
+            model_without_ddp.load_state_dict(checkpoint) # 兼容只保存了模型权重的旧版本文件
+
+        # 🌟 修复 2：全面恢复优化器、调度器和 Epoch 计数器
+        if 'optimizer_state_dict' in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            if is_main_process: print("✅ 优化器状态已恢复")
+            
+        if 'scheduler_state_dict' in checkpoint and scheduler is not None:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            if is_main_process: print("✅ 学习率调度器状态已恢复")
+            
+        if 'epoch' in checkpoint:
+            # 恢复训练时，应该从保存的下一个 Epoch 开始
+            start_epoch = checkpoint['epoch'] + 1 
+            if is_main_process: print(f"✅ 训练进度已恢复，将从 Epoch {start_epoch} 继续训练")
 
     # ==========================================
     # 5. 拉起引擎，开始训练！
@@ -209,6 +254,8 @@ def main():
     # 🌟 从 YAML 配置文件中读取具体的任务名称
     # 如果没写，默认兼容以前的分类任务
     task_name = cfg.get('task', 'train_classification')
+    # 🌟 动态获取梯度裁剪阈值 (DETR 官方标配是 0.1)
+    clip_max_norm = cfg.get('optim', {}).get('clip_max_norm', 0.1 if model_name == "dinov3_det" else None)
     trainer = build_task(
         name=task_name,
         criterion=criterion,       # 子类特有参数
@@ -219,11 +266,12 @@ def main():
         scheduler=scheduler,
         device=device,
         save_dir=args.save_dir,
-        is_main_process=is_main_process
+        is_main_process=is_main_process,
+        clip_max_norm=clip_max_norm  # 🌟 将参数传入基础引擎
     )
 
     if is_main_process: print("🚀 开始训练...")
-    trainer.train(epochs=args.epochs)
+    trainer.train(start_epoch=start_epoch, epochs=args.epochs)
 
     # 销毁分布式环境
     if is_distributed:

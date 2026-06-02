@@ -1,5 +1,6 @@
 import torch.nn as nn
 from utils.registry import Registry
+from typing import Any
 
 
 # 创建模型注册表
@@ -13,7 +14,7 @@ def register_task(name: str = None, force: bool = False):
     return TASK_REGISTRY.register(name=name, force=force)
 
 
-def build_task(name: str,*args, **kwargs) -> nn.Module:
+def build_task(name: str,*args, **kwargs) -> Any:
     """根据名称构建任务"""
     return TASK_REGISTRY.build(name, *args, **kwargs)
 

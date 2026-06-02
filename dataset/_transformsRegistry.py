@@ -38,12 +38,12 @@ def build_transforms(transform_cfgs: list):
         kwargs = cfg.get("kwargs", {})
 
         # 直接查底层的字典，比查 keys() 列表速度更快 (O(1) vs O(n))
-        if name not in TRANSFORMS_REGISTRY._module_dict:
+        if name not in TRANSFORMS_REGISTRY:
             available = ", ".join(TRANSFORMS_REGISTRY.keys())
             raise ValueError(f"❌ 未知的 Transform: '{name}'。可用列表: [{available}]")
             
         # 拿到具体的类并实例化
-        transform_cls = TRANSFORMS_REGISTRY._module_dict[name]
+        transform_cls = TRANSFORMS_REGISTRY.get(name)
         transform_list.append(transform_cls(**kwargs))
         
     # 用 torchvision 的 Compose 把它们串起来

@@ -52,12 +52,21 @@ class GlobalCrossAttention(nn.Module):
         q = self.q(query).reshape(B_, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
 
         attn_mask = None
-        # 如果图像有黑边（input_padding_mask），它会把掩码位置乘上 -100。
-        # 在随后的 Softmax 操作中，e−100 会无限趋近于 0，从而彻底切断 Query 对无效黑边区域的注意力。
+        # # 如果图像有黑边（input_padding_mask），它会把掩码位置乘上 -100。
+        # # 在随后的 Softmax 操作中，e−100 会无限趋近于 0，从而彻底切断 Query 对无效黑边区域的注意力。
+        # if input_padding_mask is not None:
+        #     attn_mask = input_padding_mask[:, None, None] * -100
+
+        # 上面的注释使用的是加法掩码，而这里使用的布尔掩码
+        # 我们用波浪号 ~ 取反，变成：True 代表有效图像，False 代表黑边
         if input_padding_mask is not None:
-            attn_mask = input_padding_mask[:, None, None] * -100
-        attn_mask = attn_mask.contiguous()  # to enable efficient attention
+            attn_mask = ~input_padding_mask[:, None, None]
+        
+        if attn_mask is not None:
+            attn_mask = attn_mask.contiguous()
+            
         # scaled_dot_product_attention 在底层融合算子并调用 FlashAttention。这极大地降低了显存占用并成倍提升了计算速度。
+        # scaled_dot_product_attention 要求 attn_mask 是 float（加法掩码）或 bool（布尔掩码）不能出现int类型
         x = torch.nn.functional.scaled_dot_product_attention(
             query=q,
             key=k,
@@ -296,6 +305,8 @@ class GlobalDecoder(nn.Module):
                     new_reference_points = new_reference_points.sigmoid()
                 # 更新后的 reference_points 被 .detach() 截断梯度后，直接作为下一层解码器的初始位置！
                 reference_points = new_reference_points.detach()
+            else:
+                new_reference_points = reference_points
 
             if self.return_intermediate:
                 intermediate.append(output_after_norm)
@@ -711,6 +722,8 @@ class GlobalRpeDecoder(nn.Module):
                     new_reference_points[..., :2] = tmp[..., :2] + inverse_sigmoid(reference_points)
                     new_reference_points = new_reference_points.sigmoid()
                 reference_points = new_reference_points.detach()
+            else:
+                new_reference_points = reference_points
 
             if self.return_intermediate:
                 intermediate.append(output_after_norm)

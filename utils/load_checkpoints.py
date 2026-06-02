@@ -24,12 +24,14 @@ def load_pretrained_weights(model: torch.nn.Module, weight_path: str) -> torch.n
     # 如果官方是用多卡 (DDP) 训练的，键名前面往往会多出一个 "module." 或者 "backbone."
     clean_state_dict = {}
     for k, v in state_dict.items():
-        # 去除 DDP 带来的 'module.' 前缀
-        if k.startswith("module."):
-            k = k[7:]
-        # 如果你只想要骨干网络，有时需要去除 'backbone.' 前缀
-        if k.startswith("backbone."):
-            k = k[9:]
+        # 只要键名还以目标前缀开头，就一直进行剥离
+        while k.startswith("module.") or k.startswith("backbone."):
+            # 去除 DDP 带来的 'module.' 前缀
+            if k.startswith("module."):
+                k = k[7:]
+            # 如果你只想要骨干网络，有时需要去除 'backbone.' 前缀
+            if k.startswith("backbone."):
+                k = k[9:]
         clean_state_dict[k] = v
 
     # 4. 加载权重进模型
@@ -53,7 +55,7 @@ if __name__ == "__main__":
     from models import build_model
 
     # 1. 构建空壳模型
-    dino_small = build_model("dino_small")
+    dino_small = build_model("dinov3_small")
 
     # 2. 注入灵魂 (请替换为你实际的权重路径)
     weight_file = "/home/jia/anktechDrive/研发部/共享/算法模型/dinov3/vit_backbone/dinov3_vits16_pretrain_lvd1689m-08c60483.pth" 

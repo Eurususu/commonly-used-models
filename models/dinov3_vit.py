@@ -225,7 +225,7 @@ class DinoVisionTransformer(nn.Module):
         torch.where 的作用就像“狸猫换太子”：如果这个位置的掩码是 True（被遮挡），
         就把原来的图像特征替换成一个全网共享的可学习参数 self.mask_token；如果没被遮挡，就保留原特征。"""
         if masks is not None:
-            x = torch.where(masks.unsqueeze(-1), self.mask_toekn.to(x.dtype).unsqueeze(0), x)
+            x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
             cls_token = self.cls_token
         else:
             """
@@ -319,7 +319,7 @@ class DinoVisionTransformer(nn.Module):
                     "masks": masks,
                 }
             )
-            return output
+        return output
 
     def forward_features(self, x: Tensor | List[Tensor], masks: Optional[Tensor] = None) -> List[Dict[str, Tensor]]:
         if isinstance(x, torch.Tensor):
@@ -519,6 +519,7 @@ def vit_huge_plus(patch_size=16, **kwargs):
     kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
     kwargs.setdefault("norm_layer", "layernormbf16")
     kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
+    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
 
     model = DinoVisionTransformer(
         patch_size=patch_size,
@@ -561,6 +562,7 @@ def vit_7b(patch_size=16, **kwargs):
     kwargs.setdefault("untie_global_and_local_cls_norm", True)  # 开启局部 CLS Norm
     kwargs.setdefault("norm_layer", "layernormbf16")
     kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
+    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
 
     model = DinoVisionTransformer(
         patch_size=patch_size,

@@ -4,11 +4,12 @@ from abc import ABC, abstractmethod
 
 class BaseValidator(ABC):
     """通用的基础验证引擎基类"""
-    def __init__(self, model, dataloader, criterion, device):
+    def __init__(self, model, dataloader, criterion, device, is_main_process=True):
         self.model = model
         self.dataloader = dataloader
         self.criterion = criterion
         self.device = device
+        self.is_main_process = is_main_process # 🌟 绑定到实例属性
 
     def _to_device(self, data):
         """递归设备适配器"""

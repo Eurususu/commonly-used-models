@@ -91,12 +91,25 @@ class PlainDETR(nn.Module):
         # if two-stage, the last class_embed and bbox_embed is for region proposal generation
         num_pred = (transformer.decoder.num_layers + 1) if two_stage else transformer.decoder.num_layers
         if with_box_refine:
+            # 🌟 True 的情况：深拷贝 
+            '''
+            这意味着 Decoder 的 6 层网络，拥有 6 个互相独立的回归头和分类头！ 为什么？
+            因为第 1 层的任务是“从全局瞎猜一个框”，而第 6 层的任务是“对一个已经很准的框做像素级微调”。
+            这 6 层预测的偏移量分布、尺度完全不同，如果强制共享权重，网络会当场精神分裂，
+            因此必须给每一层分配独立的参数去学习。
+            '''
             self.class_embed = _get_clones(self.class_embed, num_pred)
             self.bbox_embed = _get_clones(self.bbox_embed, num_pred)
             nn.init.constant_(self.bbox_embed[0].layers[-1].bias.data[2:], -2.0)
             # hack implementation for iterative bounding box refinement
             self.transformer.decoder.bbox_embed = self.bbox_embed
         else:
+            # 🌟 False 的情况：列表浅引用
+            '''
+            [self.class_embed for _ in range(num_pred)] 在 Python 中生成的是一个包含相同对象引用的列表。
+            这意味着，Decoder 的 6 层网络，使用的是完全相同的 1 个回归头（MLP）和分类头（Linear）！ 
+            因为每一层都要从头预测绝对位置，任务性质相同，共享权重可以减少参数量，防止过拟合
+            '''
             nn.init.constant_(self.bbox_embed.layers[-1].bias.data[2:], -2.0)
             self.class_embed = nn.ModuleList([self.class_embed for _ in range(num_pred)])
             self.bbox_embed = nn.ModuleList([self.bbox_embed for _ in range(num_pred)])

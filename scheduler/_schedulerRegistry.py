@@ -20,12 +20,12 @@ def build_scheduler(optimizer, name: str, *args, **kwargs):
         return None # 允许用户选择不使用调度器
 
     name = name.lower()
-    if name not in SCHEDULER_REGISTRY._module_dict:
+    if name not in SCHEDULER_REGISTRY:
         available = ", ".join(SCHEDULER_REGISTRY.keys())
         raise ValueError(f"❌ 未知调度器: {name}。可用选项: {available}")
     
     # 拿到调度器类
-    scheduler_cls = SCHEDULER_REGISTRY._module_dict[name]
+    scheduler_cls = SCHEDULER_REGISTRY.get(name)
     
     # 将 optimizer 和额外的 kwargs 一起传进去实例化
     return scheduler_cls(optimizer, *args, **kwargs)

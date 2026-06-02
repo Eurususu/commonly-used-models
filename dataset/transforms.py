@@ -61,7 +61,7 @@ class Resize:
 
         # 5. 处理边界框 (非常关键！)
         if "boxes" in target and len(target["boxes"]) > 0:
-            boxes = target["boxes"]
+            boxes = target["boxes"].clone()
             
             # 💡 假设1：如果你的 boxes 是绝对像素坐标 [x_min, y_min, x_max, y_max]
             # 我们需要计算缩放比例并应用到框上
@@ -78,7 +78,12 @@ class Resize:
             target["boxes"] = boxes
             
         return image, target
-    
+
+'''
+核心原则：
+在Transforms的整个旅途中，保持绝对坐标 [x1, y1, x2, y2]，
+只在喂给 Loss 函数的前一秒（也就是 FormatDETR），再把它变成归一化坐标！
+'''
 @register_transform("random_horizontal_flip")
 class RandomHorizontalFlip:
     def __init__(self, p=0.5):
@@ -90,10 +95,14 @@ class RandomHorizontalFlip:
             image = F.hflip(image)
             
             # 2. 同步翻转目标框 (假设框是归一化的 [cx, cy, w, h])
-            if target is not None and "boxes" in target:
-                boxes = target["boxes"]
+            if target is not None and "boxes" in target and len(target["boxes"]) > 0:
+                boxes = target["boxes"].clone() # 防御性编程，避免原地修改报错
                 # 把中心点 x 坐标翻转 (因为是 0~1 归一化，所以直接用 1 - cx)
-                boxes[:, 0] = 1.0 - boxes[:, 0]
+                if isinstance(image, torch.Tensor):
+                    w = image.shape[-1]
+                else:
+                    w = image.size[0]
+                boxes[:, [0, 2]] = w - boxes[:, [2, 0]]
                 target["boxes"] = boxes
                 
         return image, target
@@ -285,7 +294,7 @@ class RandomResize:
 
 
         if "boxes" in target and len(target["boxes"]) > 0:
-            boxes = target["boxes"]
+            boxes = target["boxes"].clone()
             
             scale_w = w_new / w_orig
             scale_h = h_new / h_orig

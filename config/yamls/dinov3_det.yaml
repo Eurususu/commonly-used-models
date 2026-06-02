@@ -160,6 +160,7 @@ loss:
 # ==========================================
 optim: 
   name: "adamw"
+  clip_max_norm: 0.1   # 👈 DETR 防止梯度爆炸的绝对必需品
   kwargs: 
     lr: 0.0001         # 👈 DETR 的基础学习率通常在 1e-4 左右
     weight_decay: 0.0001
@@ -172,3 +173,5 @@ scheduler:
   kwargs:
     T_max: 50          # 假设你要训练 50 个 epoch
     eta_min: 1.0e-6    # 降到极低的学习率收尾
+
+seed: 42

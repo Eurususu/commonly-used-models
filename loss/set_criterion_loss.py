@@ -109,11 +109,20 @@ class SetCriterion(nn.Module):
 
         # 5. 乘上我们自定义的权重系数 (Weight Dict)
         final_losses = {}
-        for k in losses.keys():
-            # 找到对应的主键名 (比如 loss_ce_3 对应 loss_ce)
-            weight_key = k.rsplit('_', 1)[0] if '_' in k and k.rsplit('_', 1)[1].isdigit() else k
-            if weight_key in self.weight_dict:
-                final_losses[k] = losses[k] * self.weight_dict[weight_key]
+        for k, v in losses.items():
+            # 🌟 修复：第一步，尝试精确匹配
+            # 这样不仅可以保护像 loss_stage_1 这种本身自带数字的基础损失，
+            # 还可以允许我们为特定的某一层单独设置独特的权重！
+            if k in self.weight_dict:
+                final_losses[k] = v * self.weight_dict[k]
+            else:
+                # 第二步：精确匹配失败，检查是否是 Aux 自动生成的后缀
+                parts = k.rsplit('_', 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    base_key = parts[0]
+                    # 第三步：用截断后的基础名去寻找权重
+                    if base_key in self.weight_dict:
+                        final_losses[k] = v * self.weight_dict[base_key]
 
         return final_losses # 这个字典就是被你 Trainer 里的 sum() 加起来的东西！
     
