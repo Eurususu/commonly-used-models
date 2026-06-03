@@ -46,7 +46,7 @@ def build_transforms(transform_cfgs: list):
         transform_cls = TRANSFORMS_REGISTRY.get(name)
         transform_list.append(transform_cls(**kwargs))
         
-    # 用 torchvision 的 Compose 把它们串起来
+    # 用 自定义 的 Compose 把它们串起来
     return CommonCompose(transform_list)
 
 

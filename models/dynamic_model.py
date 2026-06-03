@@ -3,26 +3,24 @@ import inspect
 import torch.nn as nn
 import layers
 from ._modelRegistry import register_model
-import logging
+from .BaseModel import BaseModel
 
 __all__ = ["DynamicGraphModel"]
 
 @register_model("dynamic_graph_model")
-class DynamicGraphModel(nn.Module):
+class DynamicGraphModel(BaseModel):
     '''
     基于配置文件的动态 DAG (有向无环图) 网络拼接器
     支持残差连接、特征融合等多分支结构
     '''
 
     def __init__(self, layers_cfg, **kwargs):
-        super().__init__()
-        if kwargs:
-            logging.warning(f"DynamicGraphModel 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
+        super().__init__(**kwargs)
         # 使用 ModuleList 来容纳所有层，保持它们在网络中的顺序
         self.module_list = nn.ModuleList()
         # 记录每一层的路由来源
         self.from_indices = []
-        
+
         print("🕸️  正在构建拓扑网络模型...")
 
         for i, layer_info in enumerate(layers_cfg):
@@ -46,20 +44,20 @@ class DynamicGraphModel(nn.Module):
                 module_instance = layer_cls(**layer_args)
             except TypeError as e:
                 raise TypeError(f"❌ 实例化 {layer_name} 失败，参数 {layer_args} 有误。详细报错: {e}")
-            
+
             self.module_list.append(module_instance)
             self.from_indices.append(f_idx)
-            
+
 
 
             print(f"  ├── 添加第{i}层:{layer_name} | From: {str(f_idx):<8} | 参数：{layer_args}")
 
         print("✅ 拓扑网络构建完毕！\n")
-    
+
     def forward(self, x):
         # 记忆缓存
         saved_outputs = []
-        
+
         for i, (layer, f_idx) in enumerate(zip(self.module_list, self.from_indices)):
 
             # --- 解析当前层的输入 ---
@@ -69,7 +67,7 @@ class DynamicGraphModel(nn.Module):
                     current_input = x
                 else:
                     current_input = saved_outputs[f_idx]
-                
+
                 # 单一输入直接传给 layer
                 out = layer(current_input)
 
@@ -82,10 +80,10 @@ class DynamicGraphModel(nn.Module):
                         current_input.append(x)
                     else:
                         current_input.append(saved_outputs[f])
-                
+
                 sig = inspect.signature(layer.forward)
                 valid_params = [
-                    p for p in sig.parameters.values() 
+                    p for p in sig.parameters.values()
                     if p.name != 'self' and p.kind in (p.POSITIONAL_OR_KEYWORD, p.POSITIONAL_ONLY)
                 ]
                 # 判断：如果 forward 需要接收的参数大于 1 个 (比如 def forward(self, x1, x2))
@@ -102,10 +100,9 @@ class DynamicGraphModel(nn.Module):
 
             else:
                 raise ValueError(f"不支持的 from 参数类型: {f_idx}")
-            
+
 
             # 把当前层的输出保存到记忆缓存中，供后面的层提取
             saved_outputs.append(out)
 
         return saved_outputs[-1]
-        

@@ -13,12 +13,12 @@ class SegmentationDataset(Dataset):
     """
     标准的图像分割数据集
     """
-    def __init__(self, data_dir, image_folder="images", mask_folder="masks", transform=None, **kwargs):
+    def __init__(self, data_dir, image_folder="images", mask_folder="masks", transforms=None, **kwargs):
         super().__init__()
         self.data_dir = data_dir
         self.image_dir = os.path.join(data_dir, image_folder)
         self.mask_dir = os.path.join(data_dir, mask_folder)
-        self.transform = transform
+        self.transforms = transforms
         
         # 获取所有图片的文件名 (假设原图和 mask 名字一样)
         # 实际工程中建议加个 try-except 或者 assert 检查路径是否存在
@@ -35,6 +35,8 @@ class SegmentationDataset(Dataset):
         img_name = self.images[idx]
         img_path = os.path.join(self.image_dir, img_name)
         mask_path = os.path.join(self.mask_dir, img_name)
+
+        raise NotImplementedError("SegmentationDataset 尚未实现，请使用其他数据集")
         
         # --- 这里写具体的读取逻辑 ---
         # 比如: 
@@ -47,7 +49,7 @@ class SegmentationDataset(Dataset):
         mask = torch.randint(0, 2, (1, 224, 224)).float()
         
         # 如果有数据增强，就应用它
-        if self.transform is not None:
+        if self.transforms is not None:
             # 注意：分割任务的数据增强通常需要同时对 img 和 mask 做相同的空间变换！
             pass 
             

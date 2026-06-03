@@ -389,190 +389,73 @@ class DinoVisionTransformer(nn.Module):
             return tuple(zip(outputs, class_tokens, extra_tokens))
         
 
-@register_model("dinov3_small")
-def vit_small(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
+# ============================================================
+# DINOv3 ViT 模型变体注册
+# ============================================================
 
-    model = DinoVisionTransformer(
+# 所有变体共享的默认参数
+_DINO_DEFAULTS = {
+    "n_storage_tokens": 4,
+    "mask_k_bias": True,
+    "layerscale_init": 1e-5,
+    "norm_layer": "layernormbf16",
+    "pos_embed_rope_rescale_coords": 2,
+    "pos_embed_rope_dtype": "fp32",
+}
+
+def _make_vit(*, embed_dim, depth, num_heads, ffn_ratio,
+             patch_size=16, extra_defaults=None, **kwargs):
+    """通用 ViT 工厂：注入公共默认参数后构建 DinoVisionTransformer"""
+    defaults = {**_DINO_DEFAULTS}
+    if extra_defaults:
+        defaults.update(extra_defaults)
+    for k, v in defaults.items():
+        kwargs.setdefault(k, v)
+    return DinoVisionTransformer(
         patch_size=patch_size,
-        embed_dim=384,
-        depth=12,
-        num_heads=6,
-        ffn_ratio=4,
+        embed_dim=embed_dim,
+        depth=depth,
+        num_heads=num_heads,
+        ffn_ratio=ffn_ratio,
         **kwargs,
     )
-    return model
+
+
+@register_model("dinov3_small")
+def vit_small(patch_size=16, **kwargs):
+    return _make_vit(embed_dim=384, depth=12, num_heads=6, ffn_ratio=4, patch_size=patch_size, **kwargs)
 
 @register_model("dinov3_small_plus")
 def vit_small_plus(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("ffn_layer", "swiglu")     # 使用 SwiGLU 替代普通的 MLP
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=384,
-        depth=12,
-        num_heads=6,
-        ffn_ratio=6,
-        **kwargs,
-    )
-    return model
+    return _make_vit(embed_dim=384, depth=12, num_heads=6, ffn_ratio=6, patch_size=patch_size,
+                     extra_defaults={"ffn_layer": "swiglu"}, **kwargs)
 
 @register_model("dinov3_base")
 def vit_base(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=768,
-        depth=12,
-        num_heads=12,
-        ffn_ratio=4,
-        **kwargs,
-    )
-    return model
+    return _make_vit(embed_dim=768, depth=12, num_heads=12, ffn_ratio=4, patch_size=patch_size, **kwargs)
 
 @register_model("dinov3_large")
 def vit_large(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-    # 如果是SAT493M预训练模型打开下面注释
-    # kwargs.setdefault("untie_global_and_local_cls_norm", True)  # 开启局部 CLS Norm
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=1024,
-        depth=24,
-        num_heads=16,
-        ffn_ratio=4,
-        **kwargs,
-    )
-    return model
+    return _make_vit(embed_dim=1024, depth=24, num_heads=16, ffn_ratio=4, patch_size=patch_size, **kwargs)
 
 @register_model("dinov3_large_plus")
 def vit_large_plus(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("ffn_layer", "swiglu")     # 使用 SwiGLU 替代普通的 MLP
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=1024,
-        depth=24,
-        num_heads=16,
-        ffn_ratio=6,
-        **kwargs,
-    )
-    return model
-
-# @register_model("dinov3_so400m")
-# def vit_so400m(patch_size=16, **kwargs):
-#     # 👇 补齐与官方预训练权重完全一致的魔法参数
-#     kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-#     kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-#     kwargs.setdefault("layerscale_init", 1e-4)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-
-#     model = DinoVisionTransformer(
-#         patch_size=patch_size,
-#         embed_dim=1152,
-#         depth=27,
-#         num_heads=18,
-#         ffn_ratio=3.777777778,
-#         **kwargs,
-#     )
-#     return model
+    return _make_vit(embed_dim=1024, depth=24, num_heads=16, ffn_ratio=6, patch_size=patch_size,
+                     extra_defaults={"ffn_layer": "swiglu"}, **kwargs)
 
 @register_model("dinov3_huge_plus")
 def vit_huge_plus(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("ffn_layer", "swiglu")     # 使用 SwiGLU 替代普通的 MLP
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=1280,
-        depth=32,
-        num_heads=20,
-        ffn_ratio=6,
-        **kwargs,
-    )
-    return model
-
-# @register_model("dinov3_giant2")
-# def vit_giant2(patch_size=16, **kwargs):
-#     """
-#     Close to ViT-giant, with embed-dim 1536 and 24 heads => embed-dim per head 64
-#     """
-#     # 👇 补齐与官方预训练权重完全一致的魔法参数
-#     kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-#     kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-#     kwargs.setdefault("layerscale_init", 1e-4)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-
-#     model = DinoVisionTransformer(
-#         patch_size=patch_size,
-#         embed_dim=1536,
-#         depth=40,
-#         num_heads=24,
-#         ffn_ratio=4,
-#         **kwargs,
-#     )
-#     return model
+    return _make_vit(embed_dim=1280, depth=32, num_heads=20, ffn_ratio=6, patch_size=patch_size,
+                     extra_defaults={"ffn_layer": "swiglu"}, **kwargs)
 
 @register_model("dinov3_7b")
 def vit_7b(patch_size=16, **kwargs):
-    # 👇 补齐与官方预训练权重完全一致的魔法参数
-    kwargs.setdefault("n_storage_tokens", 4)     # 开启 4 个寄存器 Token
-    kwargs.setdefault("ffn_layer", "swiglu64")   # 使用 SwiGLU64 替代普通的 MLP
-    kwargs.setdefault("qkv_bias", False)         # 关闭 QKV 的偏置
-    kwargs.setdefault("mask_k_bias", True)       # 开启 K 的掩码偏置
-    kwargs.setdefault("layerscale_init", 1e-5)   # 开启 LayerScale，通常 small 模型的初始值为 1e-4 (或 1e-5)
-    kwargs.setdefault("untie_global_and_local_cls_norm", True)  # 开启局部 CLS Norm
-    kwargs.setdefault("norm_layer", "layernormbf16")
-    kwargs.setdefault("pos_embed_rope_rescale_coords", 2)
-    kwargs.setdefault("pos_embed_rope_dtype", "fp32")
-
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=4096,
-        depth=40,
-        num_heads=32,
-        ffn_ratio=3,
-        **kwargs,
-    )
-    return model
+    return _make_vit(embed_dim=4096, depth=40, num_heads=32, ffn_ratio=3, patch_size=patch_size,
+                     extra_defaults={
+                         "ffn_layer": "swiglu64",
+                         "qkv_bias": False,
+                         "untie_global_and_local_cls_norm": True,
+                     }, **kwargs)
 
 
 

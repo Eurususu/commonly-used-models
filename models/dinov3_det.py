@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +10,7 @@ from utils.box_ops import box_xyxy_to_cxcywh, delta2bbox, box_cxcywh_to_xyxy
 from .dinov3_backbone import build_backbone
 from .detr_head_transformer import build_transformer
 from ._modelRegistry import register_model
+import logging
 
 class MLP(nn.Module):
     """Very simple multi-layer perceptron (also called FFN)"""
@@ -27,6 +29,7 @@ class MLP(nn.Module):
 
 class PlainDETR(nn.Module):
     """This is the Deformable DETR module that performs object detection"""
+    # reparam = False  # 标识：输出坐标是归一化 [0,1] cxcywh 格式
 
     def __init__(
         self,
@@ -243,6 +246,8 @@ class PlainDETR(nn.Module):
 
 
 class PlainDETRReParam(PlainDETR):
+    # reparam = True  # 标识：输出坐标是绝对像素 cxcywh 格式，需要 PostProcess 用 reparam 模式解码
+
     def forward(self, samples: NestedTensor):
         """The forward expects a NestedTensor, which consists of:
            - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
@@ -436,8 +441,51 @@ class PostProcess(nn.Module):
         return results
 
 
+def _dict_to_namespace(d):
+    """将嵌套字典递归转化为 SimpleNamespace 对象（仅供 dinov3_det 内部使用）"""
+    from types import SimpleNamespace
+    if isinstance(d, dict):
+        return SimpleNamespace(**{k: _dict_to_namespace(v) for k, v in d.items()})
+    elif isinstance(d, list):
+        return [_dict_to_namespace(v) for v in d]
+    else:
+        return d
+
+
 @register_model("dinov3_det")
-def build_model(backbone_model, args):
+def build_dinov3_det(backbone_name="dinov3_small", backbone_weight=None, **kwargs):
+    """
+    构建 DINOv3 DETR 检测模型。
+
+    与其他模型统一，接受纯字典 kwargs，内部自行处理：
+    - backbone 构建 + 预训练权重加载
+    - position_embedding 枚举转换
+    - kwargs → SimpleNamespace 转换（下游 build_backbone/build_transformer 需要）
+    """
+    from . import build_model as _build_model
+    from .dinov3_backbone import PositionEncoding
+    from utils.load_checkpoints import load_pretrained_weights
+
+    # 1. 处理 PositionEncoding 枚举转换
+    pos_str = kwargs.pop("position_embedding", "sine")
+    _pos_map = {
+        "sine": PositionEncoding.SINE,
+        "learned": PositionEncoding.LEARNED,
+        "sine_unnorm": PositionEncoding.SINE_UNNORM,
+    }
+    kwargs["position_embedding"] = _pos_map.get(pos_str, pos_str)
+
+    # 2. 转换为 Namespace（build_backbone/build_transformer 需要 args.xxx 风格访问）
+    args = _dict_to_namespace(kwargs)
+
+    # 3. 构建 backbone ViT 并加载预训练权重
+    backbone_model = _build_model(backbone_name)
+    if backbone_weight is not None and os.path.exists(backbone_weight):
+        backbone_model = load_pretrained_weights(backbone_model, backbone_weight)
+    else:
+        logging.warning(f"⚠️ 预训练权重路径不存在: {backbone_weight}，跳过加载！")
+
+    # 4. 组装 DETR
     backbone = build_backbone(backbone_model, args)
     transformer = build_transformer(args)
     model_class = PlainDETR if (not args.reparam) else PlainDETRReParam

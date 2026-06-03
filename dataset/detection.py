@@ -4,12 +4,6 @@ from torch.utils.data import Dataset
 from PIL import Image
 from ._datasetRegistry import register_dataset
 
-# 强烈建议安装 pycocotools: pip install pycocotools
-try:
-    from pycocotools.coco import COCO
-except ImportError:
-    COCO = None
-
 __all__ = ["COCODetectionDataset"]
 
 try:
@@ -34,13 +28,17 @@ class COCODetectionDataset(Dataset):
     """
     标准的 COCO 格式目标检测数据集，专为 DETR 适配目标字典格式
     """
-    def __init__(self, data_dir, ann_file, transform=None, **kwargs):
+    def __init__(self, data_dir, ann_file, transforms=None, **kwargs):
         super().__init__()
+        if kwargs:
+            import logging
+            logging.warning(f"COCODetectionDataset 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
+            
         if COCO is None:
             raise ImportError("❌ 找不到 pycocotools，请先运行: pip install pycocotools")
             
         self.data_dir = data_dir
-        self.transform = transform
+        self.transforms = transforms
         
         print(f"⏳ 正在加载 COCO 标注文件: {ann_file} ...")
         self.coco = COCO(ann_file)
@@ -111,8 +109,8 @@ class COCODetectionDataset(Dataset):
         target["orig_size"] = torch.as_tensor([int(h), int(w)])
         target["size"] = torch.as_tensor([int(h), int(w)])
 
-        # 5. 应用我们上一回合自定义的支持 (image, target) 双输入的 Transform
-        if self.transform is not None:
-            image, target = self.transform(image, target)
+        # 5. 应用我们上一回合自定义的支持 (image, target) 双输入的 Transforms
+        if self.transforms is not None:
+            image, target = self.transforms(image, target)
 
         return image, target

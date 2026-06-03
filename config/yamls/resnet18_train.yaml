@@ -37,6 +37,7 @@ data:
 
 model: 
   name: "resnet18"
+  pretrained_weight: ""
   kwargs:
     num_classes: 3
 

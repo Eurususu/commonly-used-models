@@ -2,7 +2,7 @@ from .train_engine import BaseTrainer
 from .val_engine import BaseValidator
 import torch
 from ._taskRegistry import register_task
-import tqdm
+from tqdm import tqdm
 from models.dinov3_det import PostProcess
 import torch.distributed as dist
 from pycocotools.cocoeval import COCOeval
@@ -97,8 +97,12 @@ COCO_80_TO_90_REVERSE = {
 class DetectionValidator(BaseValidator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        self.postprocessor = PostProcess(topk=100).to(self.device)
+
+        # 🌟 根据模型的 reparam 属性决定 PostProcess 的解码方式
+        # reparam=True: 模型输出绝对像素坐标，需要用 reparam 模式解码
+        # reparam=False: 模型输出归一化 [0,1] 坐标，用标准模式解码
+        self.reparam = getattr(self.model, 'reparam', False)
+        self.postprocessor = PostProcess(topk=100, reparam=self.reparam).to(self.device)
     def evaluate(self, is_coco: bool = False):
         self.model.eval()
         results = [] 
@@ -113,7 +117,15 @@ class DetectionValidator(BaseValidator):
 
                 orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
-                batch_res = self.postprocessor(outputs, orig_target_sizes)
+                # 🌟 reparam 模式需要两个尺寸参数：
+                #   target_sizes = resize 后的当前图像尺寸（用于 clamp 框不超出边界）
+                #   original_target_sizes = 原始图像尺寸（用于把坐标缩放回原始尺寸给 COCO 评估）
+                # 非 reparam 模式只需要 target_sizes = orig_size（用于把归一化坐标转为绝对像素坐标）
+                if self.reparam:
+                    target_sizes = torch.stack([t["size"] for t in targets], dim=0)
+                    batch_res = self.postprocessor(outputs, target_sizes, orig_target_sizes)
+                else:
+                    batch_res = self.postprocessor(outputs, orig_target_sizes)
                 
                 for target, res in zip(targets, batch_res):
                     img_id = target["image_id"].item()

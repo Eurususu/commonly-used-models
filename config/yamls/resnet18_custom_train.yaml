@@ -37,6 +37,7 @@ data:
 
 model: 
   name: "dynamic_graph_model"
+  pretrained_weight: ""
   kwargs:
     layers_cfg:
       - name: "Conv2d"

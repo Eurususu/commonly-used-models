@@ -88,12 +88,15 @@ data:
 # ==========================================
 # 2. 模型核心配置 (Model) - DINOv3 DETR
 # ==========================================
-model: 
+model:
   name: "dinov3_det"
-  backbone_name: "dinov3_small"
-  backbone_weight: "/home/jia/anktechDrive/研发部/共享/算法模型/dinov3/vit_backbone/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
-  
+  pretrained_weight: ""
+
   kwargs:
+    # 0. 骨干网络配置（从顶层移入 kwargs，统一由 build_model 传入）
+    backbone_name: "dinov3_small"
+    backbone_weight: "/home/jia/anktechDrive/研发部/共享/算法模型/dinov3/vit_backbone/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+
     # 1. 基础网络与维度配置
     num_classes: 80
     hidden_dim: 256

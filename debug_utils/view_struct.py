@@ -6,7 +6,10 @@ def inspect_struct(obj, indent=0):
     pad = " " * indent
     if isinstance(obj, dict):
         print(f"{pad}[字典 Dict] 包含 {len(obj)} 个键: {list(obj.keys())}")
-        for k, v in obj.items():
+        for i, (k, v) in enumerate(obj.items()):
+            if i >=5:
+                print(f"{pad}  ├── ... (剩余 {len(obj) - 5} 个键省略)")
+                break
             print(f"{pad}  ├── 键 '{k}':")
             inspect_struct(v, indent + 6)
             
@@ -62,4 +65,8 @@ if __name__ == "__main__":
     print("\n=== 探诊单个样本的数据结构 ===")
     sample = train_dataset[0]  # 取第一张图
     inspect_struct(sample)
+
+    # 查看模型文件
+    checkpoint = torch.load("model path", map_location="cpu")
+    inspect_struct(checkpoint)
 

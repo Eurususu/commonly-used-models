@@ -12,17 +12,14 @@ import torch.nn as nn
 from layers import BasicBlock, BottleNeck
 from ._modelRegistry import register_model
 from .BaseModel import BaseModel
-import logging
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
 
 class ResNet(BaseModel):
 
-    def __init__(self, block, num_block, num_classes=100, **kwargs):
-        super().__init__()
-        if kwargs:
-            logging.warning(f"ResNet 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
+    def __init__(self, block, num_block, num_classes=10, **kwargs):
+        super().__init__(**kwargs)
 
         self.in_channels = 64
 
@@ -46,20 +43,9 @@ class ResNet(BaseModel):
         self.conv5_x = self._make_layer(block, 512, num_block[3], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        
+
         # Initialize weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                # 现代 PyTorch 推荐的 Kaiming 初始化写法
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
+        self.apply(BaseModel._init_weights)
 
     def _make_layer(self, block, out_channels, num_blocks, stride):
         """make resnet layers(by layer i didnt mean this 'layer' was the
@@ -99,42 +85,31 @@ class ResNet(BaseModel):
         return output
 
 @register_model("resnet18")
-def resnet18(num_classes=100, **kwargs):
+def resnet18(num_classes=10, **kwargs):
     """ return a ResNet 18 object
     """
-    if kwargs:
-        logging.warning(f"resnet18 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes, **kwargs)
 
 @register_model("resnet34")
-def resnet34(num_classes=100, **kwargs):
+def resnet34(num_classes=10, **kwargs):
     """ return a ResNet 34 object
     """
-    if kwargs:
-        logging.warning(f"resnet34 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes, **kwargs)
 
 @register_model("resnet50")
-def resnet50(num_classes=100, **kwargs):
+def resnet50(num_classes=10, **kwargs):
     """ return a ResNet 50 object
     """
-    if kwargs:
-        logging.warning(f"resnet50 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
-    return ResNet(BottleNeck, [3, 4, 6, 3], num_classes=num_classes)
+    return ResNet(BottleNeck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)
 
 @register_model("resnet101")
-def resnet101(num_classes=100, **kwargs):
+def resnet101(num_classes=10, **kwargs):
     """ return a ResNet 101 object
     """
-    if kwargs:
-        logging.warning(f"resnet101 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
-    return ResNet(BottleNeck, [3, 4, 23, 3], num_classes=num_classes)
+    return ResNet(BottleNeck, [3, 4, 23, 3], num_classes=num_classes, **kwargs)
 
 @register_model("resnet152")
-def resnet152(num_classes=100, **kwargs):
+def resnet152(num_classes=10, **kwargs):
     """ return a ResNet 152 object
     """
-    if kwargs:
-        logging.warning(f"resnet152 收到了额外的参数 {kwargs}，但这些参数将被忽略！")
-    return ResNet(BottleNeck, [3, 8, 36, 3], num_classes=num_classes)
-
+    return ResNet(BottleNeck, [3, 8, 36, 3], num_classes=num_classes, **kwargs)

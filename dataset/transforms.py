@@ -94,7 +94,7 @@ class RandomHorizontalFlip:
             # 1. 翻转图片
             image = F.hflip(image)
             
-            # 2. 同步翻转目标框 (假设框是归一化的 [cx, cy, w, h])
+            # 2. 同步翻转目标框 绝对坐标 [x1, y1, x2, y2]，x1/x2 关于图像宽度镜像
             if target is not None and "boxes" in target and len(target["boxes"]) > 0:
                 boxes = target["boxes"].clone() # 防御性编程，避免原地修改报错
                 # 把中心点 x 坐标翻转 (因为是 0~1 归一化，所以直接用 1 - cx)
@@ -271,10 +271,6 @@ class RandomResize:
             if max_original_size / min_original_size * size > self.max_size:
                 size = int(round(self.max_size * min_original_size / max_original_size))
         
-        if isinstance(image, torch.Tensor):
-            h_orig, w_orig = image.shape[-2:]
-        else:
-            w_orig, h_orig = image.size 
 
 
         image = F.resize(image, size)
@@ -321,8 +317,10 @@ class RandomSizeCrop:
         h = image.shape[-2] if isinstance(image, torch.Tensor) else image.size[1]
         
         # 随机生成一个介于 min 和 max 之间的尺寸
-        crop_w = random.randint(self.min_size, min(w, self.max_size))
-        crop_h = random.randint(self.min_size, min(h, self.max_size))
+        # crop_w = random.randint(self.min_size, min(w, self.max_size))
+        # crop_h = random.randint(self.min_size, min(h, self.max_size))
+        crop_w = torch.randint(self.min_size, min(w, self.max_size) + 1, size=(1,)).item()
+        crop_h = torch.randint(self.min_size, min(h, self.max_size) + 1, size=(1,)).item()
         
         # 随机生成左上角
         i = torch.randint(0, h - crop_h + 1, size=(1,)).item()

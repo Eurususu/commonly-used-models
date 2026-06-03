@@ -5,60 +5,40 @@ import argparse
 import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from types import SimpleNamespace  # [🌟 新增] 用于转化 DETR 的 args
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.load_checkpoints import load_pretrained_weights
 
 
 from models import build_model
-from models.dinov3_backbone import PositionEncoding # [🌟 新增] DETR 位置编码枚举
 from dataset import create_dataloader, build_transforms
 from loss import build_loss
 from optim import build_optimizer
 from scheduler import build_scheduler
 from engine import build_task
-from utils.load_checkpoints import load_pretrained_weights
 from utils.set_seed import set_seed
-
-# [🌟 新增] 辅助函数：将字典递归转化为 Namespace 对象 (专为 DETR 准备)
-def dict_to_namespace(d):
-    """
-    将嵌套字典递归转化为 SimpleNamespace 对象。
-    """
-    if isinstance(d, dict):
-        # 🌟 核心魔法：字典推导式会直接生成一个全新的字典。
-        # 这天然实现了隔离，完全不需要显式调用 .copy()，也绝对不会污染原字典！
-        return SimpleNamespace(**{k: dict_to_namespace(v) for k, v in d.items()})
-    
-    elif isinstance(d, list):
-        # 列表推导式同样会生成一个全新的列表
-        return [dict_to_namespace(v) for v in d]
-    
-    else:
-        # 当遇到 int, float, str 等基础数据类型时，直接返回原值
-        return d
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="🚀 通用深度学习训练脚本")
-    
+
     # 核心配置文件路径 (必填项)
     parser.add_argument('--config', type=str, required=True, help="YAML 配置文件的路径")
-    
+
     # 引擎运行参数 (从命令行传入)
     parser.add_argument('--epochs', type=int, default=50, help="训练的总 Epoch 数")
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help="运行设备 (cuda 或 cpu)")
     parser.add_argument('--save_dir', type=str, default='./checkpoints/exp_default', help="权重保存目录")
-    
+
     # 可选项：是否从断点恢复训练
     parser.add_argument('--resume', type=str, default=None, help="恢复训练的 checkpoint 路径")
-    
+
     return parser.parse_args()
 
 
 def load_yaml(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
-    
+
 
 def main():
     # 1. 解析命令行参数与 YAML 配置
@@ -109,38 +89,17 @@ def main():
     # ==========================================
     # 1. 组装算法核心 (Model)
     # ==========================================
+    # 🌟 所有模型（包括 dinov3_det）统一通过 build_model(name, **kwargs) 构建
+    # dinov3_det 的 backbone 构建、权重加载、枚举转换等逻辑已内聚到其工厂函数中
     if is_main_process: print("🧠 正在构建模型...")
     model_name = cfg['model']['name']
     model_kwargs = cfg['model'].get('kwargs', {})
-    if model_name == "dinov3_det":
-        # 如果是 DETR 模型，使用特殊的 args 构造法
-        detr_args = dict_to_namespace(model_kwargs)
-        
-        # 处理枚举类型
-        if detr_args.position_embedding == 'sine':
-            detr_args.position_embedding = PositionEncoding.SINE
-        elif detr_args.position_embedding == 'learned':
-            detr_args.position_embedding = PositionEncoding.LEARNED
-        elif detr_args.position_embedding == 'sine_unnorm':
-            detr_args.position_embedding = PositionEncoding.SINE_UNNORM
-
-        backbone_name = cfg['model']['backbone_name']
-        backbone = build_model(backbone_name)
-        # 在这里把权重直接加载给 Backbone！
-        weight_path = cfg['model'].get('backbone_weight', None)
-        if is_main_process: print(f"⏳ 正在为 Backbone 加载预训练权重...")
-        if weight_path is not None and os.path.exists(weight_path):
-            backbone = load_pretrained_weights(backbone, weight_path)
-        # 再用已经装好权重的 Backbone，去构建完整的 DETR 模型
-        model = build_model(model_name, backbone_model=backbone, args=detr_args)
-    else:
-        # 如果是 ResNet18 等普通模型，直接解包传入
-        model = build_model(model_name, **model_kwargs)
-        weight_path = "..." # 如果有分类的预训练权重写这里
-        if os.path.exists(weight_path):
-            model = load_pretrained_weights(model, weight_path)
+    model = build_model(model_name, **model_kwargs)
 
     model = model.to(device)
+    pretrained_weight = cfg['model'].get('pretrained_weight', None)
+    if pretrained_weight is not None and os.path.exists(pretrained_weight):
+        model = load_pretrained_weights(model, pretrained_weight)
 
     # 🌟 核心魔法：如果是多卡，使用 DDP 包裹模型
     if is_distributed:
@@ -150,7 +109,7 @@ def main():
         find_unused = True if model_name == "dinov3_det" else False
         # 包裹 DDP
         model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=find_unused)
-    
+
 
 
     # ==========================================
@@ -174,7 +133,7 @@ def main():
 
     # 训练集
     train_transforms = build_transforms(cfg['data'].get('train_transforms', []))
-    cfg['data']['train_dataset']['kwargs']['transform'] = train_transforms
+    cfg['data']['train_dataset']['kwargs']['transforms'] = train_transforms
     # ⚠️ 注意：这里我们给 create_dataloader 多传了一个 is_distributed 标志
     train_loader = create_dataloader(
         dataset_name=cfg['data']['train_dataset']['name'],
@@ -183,12 +142,12 @@ def main():
         is_distributed=is_distributed, # 新增参数
         seed=seed  # 👈 🌟 注入当前进程的种子
     )
-    
+
     # 验证集 (可选配置)
     val_loader = None
     if 'val_dataset' in cfg['data']:
         val_transforms = build_transforms(cfg['data'].get('val_transforms', []))
-        cfg['data']['val_dataset']['kwargs']['transform'] = val_transforms
+        cfg['data']['val_dataset']['kwargs']['transforms'] = val_transforms
         val_loader = create_dataloader(
             dataset_name=cfg['data']['val_dataset']['name'],
             dataset_cfg=cfg['data']['val_dataset']['kwargs'],
@@ -203,16 +162,16 @@ def main():
     if is_main_process: print("🧠 正在构建损失函数、优化器、调度器...")
     criterion = build_loss(cfg['loss']['name'], **cfg['loss'].get('kwargs', {}))
     optimizer = build_optimizer(
-        model.parameters(), 
-        cfg['optim']['name'], 
+        model.parameters(),
+        cfg['optim']['name'],
         **cfg['optim'].get('kwargs', {})
     )
-    
+
     scheduler = None
     if 'scheduler' in cfg and cfg['scheduler'] is not None:
         scheduler = build_scheduler(
-            optimizer, 
-            cfg['scheduler']['name'], 
+            optimizer,
+            cfg['scheduler']['name'],
             **cfg['scheduler'].get('kwargs', {})
         )
 
@@ -239,14 +198,14 @@ def main():
         if 'optimizer_state_dict' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             if is_main_process: print("✅ 优化器状态已恢复")
-            
+
         if 'scheduler_state_dict' in checkpoint and scheduler is not None:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             if is_main_process: print("✅ 学习率调度器状态已恢复")
-            
+
         if 'epoch' in checkpoint:
             # 恢复训练时，应该从保存的下一个 Epoch 开始
-            start_epoch = checkpoint['epoch'] + 1 
+            start_epoch = checkpoint['epoch'] + 1
             if is_main_process: print(f"✅ 训练进度已恢复，将从 Epoch {start_epoch} 继续训练")
 
     # ==========================================
