@@ -98,34 +98,24 @@ class DetectionValidator(BaseValidator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # 🌟 根据模型的 reparam 属性决定 PostProcess 的解码方式
-        # reparam=True: 模型输出绝对像素坐标，需要用 reparam 模式解码
-        # reparam=False: 模型输出归一化 [0,1] 坐标，用标准模式解码
-        self.reparam = getattr(self.model, 'reparam', False)
-        self.postprocessor = PostProcess(topk=100, reparam=self.reparam).to(self.device)
+        # 模型输出统一为归一化 [0,1] cxcywh 格式，PostProcess 用标准模式解码即可
+        self.postprocessor = PostProcess(topk=100).to(self.device)
     def evaluate(self, is_coco: bool = False):
         self.model.eval()
-        results = [] 
+        results = []
 
 
         with torch.no_grad():
             pbar = tqdm(self.dataloader, desc="📉 正在推理验证集", leave=False, disable=not self.is_main_process)
             for batch in pbar:
                 inputs, targets = self._to_device(batch)
-                
+
                 outputs = self.model(inputs)
 
                 orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
-                # 🌟 reparam 模式需要两个尺寸参数：
-                #   target_sizes = resize 后的当前图像尺寸（用于 clamp 框不超出边界）
-                #   original_target_sizes = 原始图像尺寸（用于把坐标缩放回原始尺寸给 COCO 评估）
-                # 非 reparam 模式只需要 target_sizes = orig_size（用于把归一化坐标转为绝对像素坐标）
-                if self.reparam:
-                    target_sizes = torch.stack([t["size"] for t in targets], dim=0)
-                    batch_res = self.postprocessor(outputs, target_sizes, orig_target_sizes)
-                else:
-                    batch_res = self.postprocessor(outputs, orig_target_sizes)
+                # PostProcess 将归一化 [0,1] 坐标转为原始图像绝对像素坐标
+                batch_res = self.postprocessor(outputs, orig_target_sizes)
                 
                 for target, res in zip(targets, batch_res):
                     img_id = target["image_id"].item()

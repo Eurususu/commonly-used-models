@@ -26,10 +26,14 @@ class MLP(nn.Module):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
     
-
+"""
+reparam: false
+标准版 Deformable DETR
+预测目标：相对偏移量 (通过 Sigmoid 压平)，天然就是 0~1 归一化的，loss函数之前不需要再除以特征图尺寸了，完美契合 DETR 的训练目标和损失函数设计。
+但是收敛慢一点，依赖 inverse_sigmoid 兜底
+"""
 class PlainDETR(nn.Module):
     """This is the Deformable DETR module that performs object detection"""
-    # reparam = False  # 标识：输出坐标是归一化 [0,1] cxcywh 格式
 
     def __init__(
         self,
@@ -244,9 +248,13 @@ class PlainDETR(nn.Module):
         # as a dict having both a Tensor and a list.
         return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
 
-
+"""
+使用了重参数的 deformable detr
+输出的是绝对像素坐标
+在输入到loss函数之前必须强行除以 img_size 伪装成 0~1 归一化坐标，否则 loss 计算会炸掉
+收敛速度极快
+"""
 class PlainDETRReParam(PlainDETR):
-    # reparam = True  # 标识：输出坐标是绝对像素 cxcywh 格式，需要 PostProcess 用 reparam 模式解码
 
     def forward(self, samples: NestedTensor):
         """The forward expects a NestedTensor, which consists of:
@@ -310,6 +318,14 @@ class PlainDETRReParam(PlainDETR):
             max_shape,
         ) = self.transformer(srcs, masks, pos, query_embeds, self_attn_mask)
 
+        # ==========================================
+        # 🌟 核心修复 1：提取特征图的真实有效宽高，构建归一化分母
+        # max_shape 的格式是 (valid_H, valid_W)，每个维度都是 [BS, 1, 1]
+        # ==========================================
+        valid_H, valid_W = max_shape
+        img_size = torch.cat([valid_W, valid_H, valid_W, valid_H], dim=-1) # 变成 [BS, 1, 4]
+
+
         outputs_classes_one2one = []
         outputs_coords_one2one = []
         outputs_classes_one2many = []
@@ -328,7 +344,14 @@ class PlainDETRReParam(PlainDETR):
             outputs_class = self.class_embed[lvl](hs[lvl])
             tmp = self.bbox_embed[lvl](hs[lvl])
             if reference.shape[-1] == 4:
+                # 这里算出来的是绝对像素坐标！
                 outputs_coord = box_xyxy_to_cxcywh(delta2bbox(reference, tmp, max_shape))
+
+                # ==========================================
+                # 🌟 核心修复 2：强行把绝对坐标按回 0~1 区间，履行 DETR 数据契约！
+                # ==========================================
+                outputs_coord = outputs_coord / img_size
+                reference_norm = reference / img_size
             else:
                 raise NotImplementedError
 
@@ -338,8 +361,12 @@ class PlainDETRReParam(PlainDETR):
             outputs_coords_one2one.append(outputs_coord[:, 0 : self.num_queries_one2one])
             outputs_coords_one2many.append(outputs_coord[:, self.num_queries_one2one :])
 
-            outputs_coords_old_one2one.append(reference[:, : self.num_queries_one2one])
-            outputs_coords_old_one2many.append(reference[:, self.num_queries_one2one :])
+            # outputs_coords_old_one2one.append(reference[:, : self.num_queries_one2one])
+            # outputs_coords_old_one2many.append(reference[:, self.num_queries_one2one :])
+            # 上面修改为：
+            # 旧坐标也必须存归一化后的，因为 aux_loss 也会用到它们算 Loss
+            outputs_coords_old_one2one.append(reference_norm[:, : self.num_queries_one2one])
+            outputs_coords_old_one2many.append(reference_norm[:, self.num_queries_one2one :])
             outputs_deltas_one2one.append(tmp[:, : self.num_queries_one2one])
             outputs_deltas_one2many.append(tmp[:, self.num_queries_one2one :])
 
@@ -369,10 +396,20 @@ class PlainDETRReParam(PlainDETR):
             )
 
         if self.two_stage:
+            # out["enc_outputs"] = {
+            #     "pred_logits": enc_outputs_class,
+            #     "pred_boxes": enc_outputs_coord_unact,
+            #     "pred_boxes_old": output_proposals,
+            #     "pred_deltas": enc_outputs_delta,
+            # }
+            # 上面修改为：
+            # ==========================================
+            # 🌟 核心修复 3：将 Two-Stage 初始化的绝对锚点也除以 img_size
+            # ==========================================
             out["enc_outputs"] = {
                 "pred_logits": enc_outputs_class,
-                "pred_boxes": enc_outputs_coord_unact,
-                "pred_boxes_old": output_proposals,
+                "pred_boxes": enc_outputs_coord_unact / img_size,
+                "pred_boxes_old": output_proposals / img_size,
                 "pred_deltas": enc_outputs_delta,
             }
         return out
@@ -393,47 +430,82 @@ class PlainDETRReParam(PlainDETR):
         ]
 
 
-class PostProcess(nn.Module):
-    """This module converts the model's output into the format expected by the coco api"""
+# class PostProcess(nn.Module):
+#     """This module converts the model's output into the format expected by the coco api"""
 
-    def __init__(self, topk=100, reparam=False):
+#     def __init__(self, topk=100, reparam=False):
+#         super().__init__()
+#         self.topk = topk
+#         self.reparam = reparam
+
+#     @torch.no_grad()
+#     def forward(self, outputs, target_sizes, original_target_sizes=None):
+#         """Perform the computation
+#         Parameters:
+#             outputs: raw outputs of the model
+#             target_sizes: tensor of dimension [batch_size x 2] containing the size of each images of the batch
+#                           For evaluation, this must be the original image size (before any data augmentation)
+#                           For visualization, this should be the image size after data augment, but before padding
+#         """
+#         out_logits, out_bbox = outputs["pred_logits"], outputs["pred_boxes"]
+
+#         assert len(out_logits) == len(target_sizes)
+#         assert target_sizes.shape[1] == 2
+#         assert not self.reparam or original_target_sizes.shape[1] == 2
+
+#         prob = out_logits.sigmoid()
+#         topk_values, topk_indexes = torch.topk(prob.view(out_logits.shape[0], -1), self.topk, dim=1)
+#         scores = topk_values
+#         topk_boxes = topk_indexes // out_logits.shape[2]
+#         labels = topk_indexes % out_logits.shape[2]
+#         boxes = box_cxcywh_to_xyxy(out_bbox)
+#         boxes = torch.gather(boxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, 4))
+
+#         # and from relative [0, 1] to absolute [0, height] coordinates
+#         img_h, img_w = target_sizes.unbind(1)
+#         if self.reparam:
+#             img_h, img_w = img_h[:, None, None], img_w[:, None, None]  # [BS, 1, 1]
+#             boxes[..., 0::2].clamp_(min=torch.zeros_like(img_w), max=img_w)
+#             boxes[..., 1::2].clamp_(min=torch.zeros_like(img_h), max=img_h)
+#             scale_h, scale_w = (original_target_sizes / target_sizes).unbind(1)
+#             scale_fct = torch.stack([scale_w, scale_h, scale_w, scale_h], dim=1)
+#         else:
+#             scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
+#         boxes = boxes * scale_fct[:, None, :]
+
+#         results = [{"scores": s, "labels": l, "boxes": b} for s, l, b in zip(scores, labels, boxes)]
+
+#         return results
+
+
+class PostProcess(nn.Module):
+    """
+    既然模型层已经被我们强行拉回了 0~1 的输出规范，
+    后处理模块就不再需要去处理那乱七八糟的 reparam 逻辑了，直接乘尺寸即可！
+    """
+    def __init__(self, topk=100): 
         super().__init__()
         self.topk = topk
-        self.reparam = reparam
 
     @torch.no_grad()
     def forward(self, outputs, target_sizes, original_target_sizes=None):
-        """Perform the computation
-        Parameters:
-            outputs: raw outputs of the model
-            target_sizes: tensor of dimension [batch_size x 2] containing the size of each images of the batch
-                          For evaluation, this must be the original image size (before any data augmentation)
-                          For visualization, this should be the image size after data augment, but before padding
-        """
         out_logits, out_bbox = outputs["pred_logits"], outputs["pred_boxes"]
 
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
-        assert not self.reparam or original_target_sizes.shape[1] == 2
 
         prob = out_logits.sigmoid()
         topk_values, topk_indexes = torch.topk(prob.view(out_logits.shape[0], -1), self.topk, dim=1)
         scores = topk_values
         topk_boxes = topk_indexes // out_logits.shape[2]
         labels = topk_indexes % out_logits.shape[2]
+        
         boxes = box_cxcywh_to_xyxy(out_bbox)
         boxes = torch.gather(boxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, 4))
 
-        # and from relative [0, 1] to absolute [0, height] coordinates
+        # 统一的纯净还原逻辑：模型输出已经是 0~1 了，直接乘上真实尺寸即可
         img_h, img_w = target_sizes.unbind(1)
-        if self.reparam:
-            img_h, img_w = img_h[:, None, None], img_w[:, None, None]  # [BS, 1, 1]
-            boxes[..., 0::2].clamp_(min=torch.zeros_like(img_w), max=img_w)
-            boxes[..., 1::2].clamp_(min=torch.zeros_like(img_h), max=img_h)
-            scale_h, scale_w = (original_target_sizes / target_sizes).unbind(1)
-            scale_fct = torch.stack([scale_w, scale_h, scale_w, scale_h], dim=1)
-        else:
-            scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
+        scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
         boxes = boxes * scale_fct[:, None, :]
 
         results = [{"scores": s, "labels": l, "boxes": b} for s, l, b in zip(scores, labels, boxes)]
