@@ -12,6 +12,7 @@ from dataset import create_dataloader, build_transforms
 from loss import build_loss
 from engine import build_task
 from utils.set_seed import set_seed
+from utils.load_checkpoints import load_checkpoint
 
 '''
 # 单卡验证
@@ -84,31 +85,19 @@ def main():
     if not os.path.exists(args.checkpoint):
         raise FileNotFoundError(f"找不到权重文件: {args.checkpoint}")
     
-    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
-    
-    # # 兼容处理：支持 checkpoint_latest.pth (包含 optimizer 的大字典) 和 best_model.pth (纯权重)
-    # state_dict = checkpoint.get('model_state_dict', checkpoint)
-    # 兼容性处理：如果你保存的时候存的是纯权重，或者是包含了 'model_state_dict' 的完整字典
-    if 'model_ema_state_dict' in checkpoint:
-        state_dict = checkpoint['model_ema_state_dict']
-    elif 'model_state_dict' in checkpoint:
-        state_dict = checkpoint['model_state_dict']
-    else:
-        state_dict = checkpoint # 兼容只保存了模型权重的旧版本文件
-    
-    # 健壮性处理：防止有些旧权重保存时带了 'module.' 前缀
-    clean_state_dict = {}
-    for k, v in state_dict.items():
-        name = k[7:] if k.startswith('module.') else k
-        clean_state_dict[name] = v
-
-    model.load_state_dict(clean_state_dict, strict=True)
+    model, _ = load_checkpoint(
+                model, 
+                args.checkpoint, 
+                strict=True, 
+                prioritize_ema=True # 🌟 开启 EMA 探测
+            )
     model = model.to(device)
 
-    # 包装 DDP (验证阶段包装 DDP 不是为了算梯度，而是为了防止有些含有 SyncBatchNorm 的模型报错)
-    if is_distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    # # 包装 DDP (验证阶段包装 DDP 不是为了算梯度，而是为了防止有些含有 SyncBatchNorm 的模型报错)
+    # if is_distributed:
+    #     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    #     model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    model.eval() # 推理模式
 
     # ==========================================
     # 2. 组装验证集数据流 (Data)

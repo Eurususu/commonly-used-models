@@ -43,6 +43,7 @@ class BaseTrainer(ABC):
         if isinstance(data, torch.Tensor): return data.to(self.device)
         elif isinstance(data, dict): return {k: self._to_device(v) for k, v in data.items()}
         elif isinstance(data, list): return [self._to_device(v) for v in data]
+        elif isinstance(data, tuple):return tuple(self._to_device(v) for v in data)
         elif hasattr(data, 'to'): return data.to(self.device)
         return data
 
@@ -179,7 +180,7 @@ class BaseTrainer(ABC):
                 # 🌟 新增：保存断点时，必须把 EMA 的状态也存进去！
                 if self.use_ema:
                     checkpoint['model_ema_state_dict'] = self.ema_model.module.state_dict()
-                    
+
                 latest_save_path = os.path.join(self.save_dir, "checkpoint_latest.pth")
                 tmp_save_path = os.path.join(self.save_dir, "checkpoint_latest.pth.tmp")
                 torch.save(checkpoint, tmp_save_path)

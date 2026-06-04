@@ -16,6 +16,7 @@ class BaseValidator(ABC):
         if isinstance(data, torch.Tensor): return data.to(self.device)
         elif isinstance(data, dict): return {k: self._to_device(v) for k, v in data.items()}
         elif isinstance(data, list): return [self._to_device(v) for v in data]
+        elif isinstance(data, tuple):return tuple(self._to_device(v) for v in data)
         elif hasattr(data, 'to'): return data.to(self.device)
         return data
 

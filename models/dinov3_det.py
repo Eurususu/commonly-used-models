@@ -536,7 +536,7 @@ def build_dinov3_det(backbone_name="dinov3_small", backbone_weight=None, **kwarg
     """
     from . import build_model as _build_model
     from .dinov3_backbone import PositionEncoding
-    from utils.load_checkpoints import load_pretrained_weights
+    from utils.load_checkpoints import load_checkpoint
 
     # 1. 处理 PositionEncoding 枚举转换
     pos_str = kwargs.pop("position_embedding", "sine")
@@ -553,7 +553,7 @@ def build_dinov3_det(backbone_name="dinov3_small", backbone_weight=None, **kwarg
     # 3. 构建 backbone ViT 并加载预训练权重
     backbone_model = _build_model(backbone_name)
     if backbone_weight is not None and os.path.exists(backbone_weight):
-        backbone_model = load_pretrained_weights(backbone_model, backbone_weight)
+        backbone_model, _ = load_checkpoint(backbone_model, backbone_weight)
     else:
         logging.warning(f"⚠️ 预训练权重路径不存在: {backbone_weight}，跳过加载！")
 

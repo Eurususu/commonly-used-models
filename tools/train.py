@@ -6,7 +6,7 @@ import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.load_checkpoints import load_pretrained_weights
+from utils.load_checkpoints import load_checkpoint
 
 
 from models import build_model
@@ -99,7 +99,7 @@ def main():
     model = model.to(device)
     pretrained_weight = cfg['model'].get('pretrained_weight', None)
     if pretrained_weight is not None and os.path.exists(pretrained_weight):
-        model = load_pretrained_weights(model, pretrained_weight)
+        model, _ = load_checkpoint(model, pretrained_weight, strict=False)
 
     # 🌟 核心魔法：如果是多卡，使用 DDP 包裹模型
     if is_distributed:
@@ -181,27 +181,21 @@ def main():
     start_epoch = 0
     if args.resume and os.path.exists(args.resume):
         if is_main_process: print(f"⏳ 正在从 {args.resume} 恢复权重...")
-        # 注意：多卡恢复时，需将权重映射到当前卡的 device
-        checkpoint = torch.load(args.resume, map_location=device, weights_only=False)
 
         # 🌟 修复 1：处理 DDP 包装器的 module. 前缀问题
         # 如果模型已经被 DDP 包装，我们需要提取底层的 model.module 来加载干净的权重
         model_without_ddp = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
 
-        # 兼容性处理：如果你保存的时候存的是纯权重，或者是包含了 'model_state_dict' 的完整字典
-        if 'model_ema_state_dict' in checkpoint:
-            if is_main_process: print("✨ 检测到 EMA (指数滑动平均) 权重，正在加载 EMA 模型...")
-            model_without_ddp.load_state_dict(checkpoint['model_ema_state_dict'])
-        elif 'model_state_dict' in checkpoint:
-            if is_main_process: print("✨ 检测到完整的权重字典，正在加载权重...")
-            model_without_ddp.load_state_dict(checkpoint['model_state_dict'])
-        else:
-            if is_main_process: print("✨ 检测到纯权重，正在加载权重...")
-            model_without_ddp.load_state_dict(checkpoint) # 兼容只保存了模型权重的旧版本文件
+        _, checkpoint = load_checkpoint(model_without_ddp, args.resume)
 
         # 🌟 修复 2：全面恢复优化器、调度器和 Epoch 计数器
         if 'optimizer_state_dict' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            # 🌟 核心修复：遍历优化器里的每一个状态张量，强行搬运到当前 GPU
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(device)
             if is_main_process: print("✅ 优化器状态已恢复")
 
         if 'scheduler_state_dict' in checkpoint and scheduler is not None:
