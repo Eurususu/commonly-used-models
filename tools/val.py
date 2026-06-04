@@ -86,8 +86,15 @@ def main():
     
     checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     
-    # 兼容处理：支持 checkpoint_latest.pth (包含 optimizer 的大字典) 和 best_model.pth (纯权重)
-    state_dict = checkpoint.get('model_state_dict', checkpoint)
+    # # 兼容处理：支持 checkpoint_latest.pth (包含 optimizer 的大字典) 和 best_model.pth (纯权重)
+    # state_dict = checkpoint.get('model_state_dict', checkpoint)
+    # 兼容性处理：如果你保存的时候存的是纯权重，或者是包含了 'model_state_dict' 的完整字典
+    if 'model_ema_state_dict' in checkpoint:
+        state_dict = checkpoint['model_ema_state_dict']
+    elif 'model_state_dict' in checkpoint:
+        state_dict = checkpoint['model_state_dict']
+    else:
+        state_dict = checkpoint # 兼容只保存了模型权重的旧版本文件
     
     # 健壮性处理：防止有些旧权重保存时带了 'module.' 前缀
     clean_state_dict = {}

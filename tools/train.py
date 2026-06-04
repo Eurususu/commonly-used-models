@@ -189,9 +189,14 @@ def main():
         model_without_ddp = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
 
         # 兼容性处理：如果你保存的时候存的是纯权重，或者是包含了 'model_state_dict' 的完整字典
-        if 'model_state_dict' in checkpoint:
+        if 'model_ema_state_dict' in checkpoint:
+            if is_main_process: print("✨ 检测到 EMA (指数滑动平均) 权重，正在加载 EMA 模型...")
+            model_without_ddp.load_state_dict(checkpoint['model_ema_state_dict'])
+        elif 'model_state_dict' in checkpoint:
+            if is_main_process: print("✨ 检测到完整的权重字典，正在加载权重...")
             model_without_ddp.load_state_dict(checkpoint['model_state_dict'])
         else:
+            if is_main_process: print("✨ 检测到纯权重，正在加载权重...")
             model_without_ddp.load_state_dict(checkpoint) # 兼容只保存了模型权重的旧版本文件
 
         # 🌟 修复 2：全面恢复优化器、调度器和 Epoch 计数器
@@ -229,7 +234,8 @@ def main():
         is_main_process=is_main_process,
         clip_max_norm=clip_max_norm  # 🌟 将参数传入基础引擎
     )
-
+    if args.resume and os.path.exists(args.resume):
+        trainer.best_metric = checkpoint.get('best_metric', 0.0)
     if is_main_process: print("🚀 开始训练...")
     trainer.train(start_epoch=start_epoch, epochs=args.epochs)
 

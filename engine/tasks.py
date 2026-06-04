@@ -1,6 +1,7 @@
 from .train_engine import BaseTrainer
 from .val_engine import BaseValidator
 import torch
+import gc
 from ._taskRegistry import register_task
 from tqdm import tqdm
 from models.dinov3_det import PostProcess
@@ -116,31 +117,34 @@ class DetectionValidator(BaseValidator):
 
                 # PostProcess 将归一化 [0,1] 坐标转为原始图像绝对像素坐标
                 batch_res = self.postprocessor(outputs, orig_target_sizes)
-                
+
                 for target, res in zip(targets, batch_res):
                     img_id = target["image_id"].item()
-                    
+
                     for box, score, label in zip(res['boxes'], res['scores'], res['labels']):
                         # 过滤掉极低置信度的框，加速后续评估
-                        if score.item() < 0.001: 
+                        if score.item() < 0.001:
                             continue
-                            
+
                         # 转换坐标系: xyxy -> xywh
                         x1, y1, x2, y2 = box.tolist()
                         w, h = x2 - x1, y2 - y1
-                        
+
                         # 映射类别 ID
                         if is_coco:
                             coco_cat_id = COCO_80_TO_90_REVERSE.get(label.item(), label.item())
                         else:
                             coco_cat_id = label.item()
-                        
+
                         results.append({
                             "image_id": img_id,
                             "category_id": coco_cat_id,
                             "bbox": [round(x1, 3), round(y1, 3), round(w, 3), round(h, 3)],
                             "score": round(score.item(), 5)
                         })
+
+                # 🌟 及时释放本批次 GPU 中间张量，避免验证循环中同时存在两组大张量
+                del inputs, targets, outputs, batch_res, orig_target_sizes
                 
         # ==========================================
         # 🌟 核心点：多卡环境下的结果汇总 (DDP 同步)
@@ -190,11 +194,27 @@ class DetectionValidator(BaseValidator):
                 "mAP_50": map_50
             }
 
+            # 🌟 优化 2：彻底抹杀 COCOeval 的内存残留 (CPU RAM)
+            del coco_dt, coco_eval
+
         # 如果是多卡训练，主进程的 mAP 计算完了，需要广播给其他显卡，确保大家保存模型的进度一致
         if dist.is_available() and dist.is_initialized():
             metric_tensor = torch.tensor([map_50_95], dtype=torch.float32, device=self.device)
             dist.broadcast(metric_tensor, src=0)
             map_50_95 = metric_tensor.item()
+
+        # 🌟 优化 3：设置屏障，确保所有进程的变量都已经用完了，再统一清理
+        if dist.is_available() and dist.is_initialized():
+            dist.barrier()
+            
+        # 🌟 优化 4：使用安全清理策略
+        if 'gathered_results' in locals(): del gathered_results
+        if 'results' in locals(): del results
+        if 'all_results' in locals(): del all_results
+
+        # 强制 Python 执行一次垃圾回收，然后清空 CUDA 缓存
+        gc.collect()
+        torch.cuda.empty_cache()
 
         return map_50_95, val_logs
     
